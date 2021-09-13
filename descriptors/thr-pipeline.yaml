@@ -1,0 +1,26 @@
+flow: ThrPipeLine
+operators: []
+sources:
+  - id : ThrSource
+    uri: file://./target/release/examples/libthr_source.so
+    configuration:
+      payload_size: 8
+    output:
+      id: Data
+      type: thr
+sinks:
+  - id : ThrSink
+    uri: file://./target/release/examples/libthr_sink.so
+    configuration:
+      payload_size: 8
+    input:
+      id: Data
+      type: thr
+
+links:
+- from:
+    component : ThrSource
+    output : Data
+  to:
+    component : ThrSink
+    input : Data

@@ -1,0 +1,46 @@
+[package]
+name = "zenoh-flow-perf"
+version = "0.1.0"
+repository = "https://github.com/eclipse-zenoh/zenoh-flow"
+homepage = "http://zenoh.io"
+authors = ["kydos <angelo@icorsaro.net>",
+           "gabrik <gabriele.baldoni@gmail.com>",
+           "Julien Loudet <julien.loudet@adlinktech.com>",]
+edition = "2018"
+license = " EPL-2.0 OR Apache-2.0"
+categories = ["network-programming"]
+description = "Zenoh-Flow: zenoh-based data-flow programming framework for computations that span from the cloud to the device."
+readme = "README.md"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+zenoh-flow = { git = "https://github.com/eclipse-zenoh/zenoh-flow.git", branch = "master" }
+env_logger = "0.9"
+serde = { version = "1.0.55", features = ["derive"] }
+async-std = { version = "=1.9.0", features = ["attributes"] }
+typetag = "0.1"
+log = "0.4"
+bincode = "1"
+zenoh = { git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "master" }
+uhlc = { git = "https://github.com/atolab/uhlc-rs.git", branch = "master" }
+
+[dev-dependencies]
+rand = "0.8.0"
+serde = { version = "1.0.55", features = ["derive"] }
+async-std = { version = "=1.9.0", features = ["attributes","unstable"] }
+futures = "0.3.5"
+flume = "0.10"
+serde_json = "1.0"
+async-ctrlc ={version = "1.2.0", features = ["stream"]}
+async-trait = "0.1.50"
+
+
+[[example]]
+name = "thr-source"
+crate-type = ["cdylib"]
+
+
+[[example]]
+name = "thr-sink"
+crate-type = ["cdylib"]

@@ -40,7 +40,14 @@ async-trait = "0.1.50"
 name = "thr-source"
 crate-type = ["cdylib"]
 
-
 [[example]]
 name = "thr-sink"
+crate-type = ["cdylib"]
+
+[[example]]
+name = "lat-source"
+crate-type = ["cdylib"]
+
+[[example]]
+name = "lat-sink"
 crate-type = ["cdylib"]

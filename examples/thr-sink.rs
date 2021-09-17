@@ -13,18 +13,18 @@
 //
 
 use async_trait::async_trait;
+use futures::future::{AbortHandle, Abortable};
 use std::collections::HashMap;
-use zenoh_flow::async_std::sync::{Arc};
-use zenoh_flow::runtime::message::ZFDataMessage;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::time::{Duration, Instant};
+use zenoh_flow::async_std::sync::Arc;
+use zenoh_flow::runtime::message::DataMessage;
 use zenoh_flow::zenoh_flow_derive::ZFState;
 use zenoh_flow::{
-    default_input_rule, downcast, downcast_mut, export_sink, types::ZFResult, Token, ZFComponent,
-    ZFComponentInputRule, ZFStateTrait,
+    default_input_rule, downcast, downcast_mut, export_sink, types::ZFResult, Component, InputRule,
+    PortId, State, Token,
 };
-use zenoh_flow::{ZFContext, ZFSinkTrait};
-use std::sync::atomic::{AtomicUsize, Ordering};
-use futures::future::{Abortable, AbortHandle};
-use std::time::{Instant, Duration};
+use zenoh_flow::{Context, Sink};
 
 struct ThrSink;
 
@@ -32,16 +32,16 @@ struct ThrSink;
 struct SinkState {
     pub payload_size: usize,
     pub accumulator: Arc<AtomicUsize>,
-    pub abort_handle : AbortHandle,
+    pub abort_handle: AbortHandle,
 }
 
 #[async_trait]
-impl ZFSinkTrait for ThrSink {
+impl Sink for ThrSink {
     async fn run(
         &self,
-        _context: &mut ZFContext,
-        _state: &mut Box<dyn ZFStateTrait>,
-        _inputs: &mut HashMap<String, ZFDataMessage>,
+        _context: &mut Context,
+        _state: &mut Box<dyn State>,
+        _inputs: &mut HashMap<PortId, DataMessage>,
     ) -> ZFResult<()> {
         let state = downcast!(SinkState, _state).unwrap();
         state.accumulator.fetch_add(1, Ordering::Relaxed);
@@ -49,14 +49,14 @@ impl ZFSinkTrait for ThrSink {
     }
 }
 
-impl ZFComponent for ThrSink {
-    fn initialize(&self, configuration: &Option<HashMap<String, String>>) -> Box<dyn ZFStateTrait> {
+impl Component for ThrSink {
+    fn initialize(&self, configuration: &Option<HashMap<String, String>>) -> Box<dyn State> {
         let payload_size = match configuration {
             Some(conf) => conf.get("payload_size").unwrap().parse::<usize>().unwrap(),
             None => 8usize,
         };
 
-        let  accumulator =  Arc::new(AtomicUsize::new(0usize));
+        let accumulator = Arc::new(AtomicUsize::new(0usize));
 
         let loop_accumulator = Arc::clone(&accumulator);
         let loop_payload_size = payload_size.clone();
@@ -84,10 +84,14 @@ impl ZFComponent for ThrSink {
         let (abort_handle, abort_registration) = AbortHandle::new_pair();
         let _print_task = async_std::task::spawn(Abortable::new(print_loop, abort_registration));
 
-        Box::new(SinkState { payload_size, accumulator, abort_handle })
+        Box::new(SinkState {
+            payload_size,
+            accumulator,
+            abort_handle,
+        })
     }
 
-    fn clean(&self, state: &mut Box<dyn ZFStateTrait>) -> ZFResult<()> {
+    fn clean(&self, state: &mut Box<dyn State>) -> ZFResult<()> {
         let real_state = downcast_mut!(SinkState, state).unwrap();
 
         real_state.abort_handle.abort();
@@ -95,12 +99,12 @@ impl ZFComponent for ThrSink {
     }
 }
 
-impl ZFComponentInputRule for ThrSink {
+impl InputRule for ThrSink {
     fn input_rule(
         &self,
-        _context: &mut ZFContext,
-        state: &mut Box<dyn ZFStateTrait>,
-        tokens: &mut HashMap<String, Token>,
+        _context: &mut Context,
+        state: &mut Box<dyn State>,
+        tokens: &mut HashMap<PortId, Token>,
     ) -> ZFResult<bool> {
         default_input_rule(state, tokens)
     }
@@ -108,6 +112,6 @@ impl ZFComponentInputRule for ThrSink {
 
 export_sink!(register);
 
-fn register() -> ZFResult<Arc<dyn ZFSinkTrait>> {
-    Ok(Arc::new(ThrSink) as Arc<dyn ZFSinkTrait>)
+fn register() -> ZFResult<Arc<dyn Sink>> {
+    Ok(Arc::new(ThrSink) as Arc<dyn Sink>)
 }

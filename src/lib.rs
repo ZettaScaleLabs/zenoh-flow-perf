@@ -12,58 +12,55 @@
 //   ADLINK zenoh team, <zenoh@adlink-labs.tech>
 //
 
-
-use zenoh_flow::serde::{Deserialize, Serialize};
-use zenoh_flow::zenoh_flow_derive::{ZFData};
-use zenoh_flow::{ZFDataTrait, ZFDeserializable, ZFError, ZFResult};
 use std::time::{SystemTime, UNIX_EPOCH};
+use zenoh_flow::serde::{Deserialize, Serialize};
+use zenoh_flow::zenoh_flow_derive::ZFData;
+use zenoh_flow::{Data, Deserializable, ZFError, ZFResult};
 
 #[derive(Debug, Clone, ZFData, Serialize, Deserialize)]
-pub struct ThrData{
-    pub data : Vec<u8>
+pub struct ThrData {
+    pub data: Vec<u8>,
 }
 
-impl ZFDataTrait for ThrData {
+impl Data for ThrData {
     fn try_serialize(&self) -> zenoh_flow::ZFResult<Vec<u8>> {
-        Ok(bincode::serialize(self).map_err(|_| ZFError::SerializationError)?.to_vec())
+        Ok(bincode::serialize(self)
+            .map_err(|_| ZFError::SerializationError)?
+            .to_vec())
     }
 }
 
-impl ZFDeserializable for ThrData {
+impl Deserializable for ThrData {
     fn try_deserialize(bytes: &[u8]) -> ZFResult<ThrData>
     where
         Self: Sized,
     {
-        Ok(
-            bincode::deserialize::<ThrData>(bytes).map_err(|_| ZFError::DeseralizationError)?,
-        )
+        bincode::deserialize::<ThrData>(bytes).map_err(|_| ZFError::DeseralizationError)
     }
 }
 
-
 #[derive(Debug, Clone, ZFData, Serialize, Deserialize)]
-pub struct LatData{
-    pub data : Vec<u8>,
+pub struct LatData {
+    pub data: Vec<u8>,
     pub ts: u128,
 }
 
-impl ZFDataTrait for LatData {
+impl Data for LatData {
     fn try_serialize(&self) -> zenoh_flow::ZFResult<Vec<u8>> {
-        Ok(bincode::serialize(self).map_err(|_| ZFError::SerializationError)?.to_vec())
+        Ok(bincode::serialize(self)
+            .map_err(|_| ZFError::SerializationError)?
+            .to_vec())
     }
 }
 
-impl ZFDeserializable for LatData {
+impl Deserializable for LatData {
     fn try_deserialize(bytes: &[u8]) -> ZFResult<LatData>
     where
         Self: Sized,
     {
-        Ok(
-            bincode::deserialize::<LatData>(bytes).map_err(|_| ZFError::DeseralizationError)?,
-        )
+        bincode::deserialize::<LatData>(bytes).map_err(|_| ZFError::DeseralizationError)
     }
 }
-
 
 pub fn get_epoch_us() -> u128 {
     SystemTime::now()

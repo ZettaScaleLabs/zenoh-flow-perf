@@ -14,15 +14,15 @@
 
 use async_trait::async_trait;
 use std::collections::HashMap;
-use zenoh_flow::async_std::sync::{Arc};
-use zenoh_flow::runtime::message::ZFDataMessage;
+use zenoh_flow::async_std::sync::Arc;
+use zenoh_flow::runtime::message::DataMessage;
 use zenoh_flow::zenoh_flow_derive::ZFState;
 use zenoh_flow::{
-    default_input_rule, get_input, export_sink, types::ZFResult, Token, ZFComponent,
-    ZFComponentInputRule, ZFStateTrait,
+    default_input_rule, export_sink, get_input, types::ZFResult, Component, InputRule, PortId,
+    State, Token,
 };
-use zenoh_flow::{ZFContext, ZFSinkTrait};
-use zenoh_flow_perf::{LatData, get_epoch_us};
+use zenoh_flow::{Context, Sink};
+use zenoh_flow_perf::{get_epoch_us, LatData};
 
 static INPUT: &str = "Data";
 
@@ -34,12 +34,12 @@ struct SinkState {
 }
 
 #[async_trait]
-impl ZFSinkTrait for ThrSink {
+impl Sink for ThrSink {
     async fn run(
         &self,
-        _context: &mut ZFContext,
-        _state: &mut Box<dyn ZFStateTrait>,
-        inputs: &mut HashMap<String, ZFDataMessage>,
+        _context: &mut Context,
+        _state: &mut Box<dyn State>,
+        inputs: &mut HashMap<PortId, DataMessage>,
     ) -> ZFResult<()> {
         // let state = downcast!(SinkState, state).unwrap();
         let (_, data) = get_input!(LatData, String::from(INPUT), inputs)?;
@@ -57,13 +57,12 @@ impl ZFSinkTrait for ThrSink {
             elapsed
         );
 
-
         Ok(())
     }
 }
 
-impl ZFComponent for ThrSink {
-    fn initialize(&self, configuration: &Option<HashMap<String, String>>) -> Box<dyn ZFStateTrait> {
+impl Component for ThrSink {
+    fn initialize(&self, configuration: &Option<HashMap<String, String>>) -> Box<dyn State> {
         let payload_size = match configuration {
             Some(conf) => conf.get("payload_size").unwrap().parse::<usize>().unwrap(),
             None => 8usize,
@@ -72,17 +71,17 @@ impl ZFComponent for ThrSink {
         Box::new(SinkState { payload_size })
     }
 
-    fn clean(&self, _state: &mut Box<dyn ZFStateTrait>) -> ZFResult<()> {
+    fn clean(&self, _state: &mut Box<dyn State>) -> ZFResult<()> {
         Ok(())
     }
 }
 
-impl ZFComponentInputRule for ThrSink {
+impl InputRule for ThrSink {
     fn input_rule(
         &self,
-        _context: &mut ZFContext,
-        state: &mut Box<dyn ZFStateTrait>,
-        tokens: &mut HashMap<String, Token>,
+        _context: &mut Context,
+        state: &mut Box<dyn State>,
+        tokens: &mut HashMap<PortId, Token>,
     ) -> ZFResult<bool> {
         default_input_rule(state, tokens)
     }
@@ -90,6 +89,6 @@ impl ZFComponentInputRule for ThrSink {
 
 export_sink!(register);
 
-fn register() -> ZFResult<Arc<dyn ZFSinkTrait>> {
-    Ok(Arc::new(ThrSink) as Arc<dyn ZFSinkTrait>)
+fn register() -> ZFResult<Arc<dyn Sink>> {
+    Ok(Arc::new(ThrSink) as Arc<dyn Sink>)
 }

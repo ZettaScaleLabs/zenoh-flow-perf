@@ -16,10 +16,10 @@ use async_std::sync::Arc;
 use async_trait::async_trait;
 use std::collections::HashMap;
 use std::time::Duration;
-use zenoh_flow::{default_output_rule, Component, OutputRule, Source};
 use zenoh_flow::{
     downcast, types::ZFResult, zenoh_flow_derive::ZFState, zf_data, PortId, SerDeData, State,
 };
+use zenoh_flow::{Node, Source};
 use zenoh_flow_perf::{get_epoch_us, LatData};
 
 static SOURCE: &str = "Data";
@@ -39,8 +39,7 @@ impl Source for ThrSource {
         &self,
         _context: &mut zenoh_flow::Context,
         state: &mut Box<dyn zenoh_flow::State>,
-    ) -> ZFResult<HashMap<PortId, SerDeData>> {
-        let mut results: HashMap<PortId, SerDeData> = HashMap::new();
+    ) -> ZFResult<(PortId, SerDeData)> {
         let real_state = downcast!(ThrSourceState, state).unwrap();
 
         async_std::task::sleep(Duration::from_secs_f64(real_state.interveal)).await;
@@ -52,23 +51,11 @@ impl Source for ThrSource {
             ts,
         };
 
-        results.insert(PortId::from(SOURCE), zf_data!(data));
-        Ok(results)
+        Ok((PortId::from(SOURCE), zf_data!(data)))
     }
 }
 
-impl OutputRule for ThrSource {
-    fn output_rule(
-        &self,
-        _context: &mut zenoh_flow::Context,
-        state: &mut Box<dyn zenoh_flow::State>,
-        outputs: HashMap<PortId, SerDeData>,
-    ) -> ZFResult<HashMap<zenoh_flow::PortId, zenoh_flow::ComponentOutput>> {
-        default_output_rule(state, outputs)
-    }
-}
-
-impl Component for ThrSource {
+impl Node for ThrSource {
     fn initialize(
         &self,
         configuration: &Option<HashMap<String, String>>,

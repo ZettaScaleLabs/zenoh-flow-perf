@@ -20,10 +20,7 @@ use std::time::{Duration, Instant};
 use zenoh_flow::async_std::sync::Arc;
 use zenoh_flow::runtime::message::DataMessage;
 use zenoh_flow::zenoh_flow_derive::ZFState;
-use zenoh_flow::{
-    default_input_rule, downcast, downcast_mut, export_sink, types::ZFResult, Component, InputRule,
-    PortId, State, Token,
-};
+use zenoh_flow::{downcast, downcast_mut, export_sink, types::ZFResult, Node, State};
 use zenoh_flow::{Context, Sink};
 
 struct ThrSink;
@@ -41,7 +38,7 @@ impl Sink for ThrSink {
         &self,
         _context: &mut Context,
         _state: &mut Box<dyn State>,
-        _inputs: &mut HashMap<PortId, DataMessage>,
+        _inputs: DataMessage,
     ) -> ZFResult<()> {
         let state = downcast!(SinkState, _state).unwrap();
         state.accumulator.fetch_add(1, Ordering::Relaxed);
@@ -49,7 +46,7 @@ impl Sink for ThrSink {
     }
 }
 
-impl Component for ThrSink {
+impl Node for ThrSink {
     fn initialize(&self, configuration: &Option<HashMap<String, String>>) -> Box<dyn State> {
         let payload_size = match configuration {
             Some(conf) => conf.get("payload_size").unwrap().parse::<usize>().unwrap(),
@@ -59,7 +56,7 @@ impl Component for ThrSink {
         let accumulator = Arc::new(AtomicUsize::new(0usize));
 
         let loop_accumulator = Arc::clone(&accumulator);
-        let loop_payload_size = payload_size.clone();
+        let loop_payload_size = payload_size;
 
         let print_loop = async move {
             println!("layer,scenario,test,name,size,messages");
@@ -96,17 +93,6 @@ impl Component for ThrSink {
 
         real_state.abort_handle.abort();
         Ok(())
-    }
-}
-
-impl InputRule for ThrSink {
-    fn input_rule(
-        &self,
-        _context: &mut Context,
-        state: &mut Box<dyn State>,
-        tokens: &mut HashMap<PortId, Token>,
-    ) -> ZFResult<bool> {
-        default_input_rule(state, tokens)
     }
 }
 

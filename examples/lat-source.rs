@@ -18,7 +18,7 @@ use std::collections::HashMap;
 use std::time::Duration;
 use zenoh_flow::{default_output_rule, Component, OutputRule, Source};
 use zenoh_flow::{
-    downcast, types::ZFResult, zenoh_flow_derive::ZFState, zf_data, Data, PortId, State,
+    downcast, types::ZFResult, zenoh_flow_derive::ZFState, zf_data, PortId, SerDeData, State,
 };
 use zenoh_flow_perf::{get_epoch_us, LatData};
 
@@ -39,8 +39,8 @@ impl Source for ThrSource {
         &self,
         _context: &mut zenoh_flow::Context,
         state: &mut Box<dyn zenoh_flow::State>,
-    ) -> ZFResult<HashMap<PortId, Arc<dyn Data>>> {
-        let mut results: HashMap<PortId, Arc<dyn Data>> = HashMap::new();
+    ) -> ZFResult<HashMap<PortId, SerDeData>> {
+        let mut results: HashMap<PortId, SerDeData> = HashMap::new();
         let real_state = downcast!(ThrSourceState, state).unwrap();
 
         async_std::task::sleep(Duration::from_secs_f64(real_state.interveal)).await;
@@ -62,7 +62,7 @@ impl OutputRule for ThrSource {
         &self,
         _context: &mut zenoh_flow::Context,
         state: &mut Box<dyn zenoh_flow::State>,
-        outputs: HashMap<PortId, Arc<dyn Data>>,
+        outputs: HashMap<PortId, SerDeData>,
     ) -> ZFResult<HashMap<zenoh_flow::PortId, zenoh_flow::ComponentOutput>> {
         default_output_rule(state, outputs)
     }

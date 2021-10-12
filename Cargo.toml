@@ -34,7 +34,8 @@ flume = "0.10"
 serde_json = "1.0"
 async-ctrlc ={version = "1.2.0", features = ["stream"]}
 async-trait = "0.1.50"
-
+structopt = "0.3.13"
+clap = "2.33"
 
 [[example]]
 name = "thr-source"
@@ -51,3 +52,9 @@ crate-type = ["cdylib"]
 [[example]]
 name = "lat-sink"
 crate-type = ["cdylib"]
+
+[[example]]
+name = "lat-link"
+
+[[example]]
+name = "thr-link"

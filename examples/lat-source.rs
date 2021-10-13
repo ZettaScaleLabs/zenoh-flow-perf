@@ -17,12 +17,10 @@ use async_trait::async_trait;
 use std::collections::HashMap;
 use std::time::Duration;
 use zenoh_flow::{
-    downcast, types::ZFResult, zenoh_flow_derive::ZFState, zf_data, PortId, SerDeData, State,
+    downcast, types::ZFResult, zenoh_flow_derive::ZFState, zf_data, SerDeData, State,
 };
 use zenoh_flow::{Node, Source};
 use zenoh_flow_perf::{get_epoch_us, LatData};
-
-static SOURCE: &str = "Data";
 
 #[derive(Debug)]
 struct ThrSource;
@@ -39,7 +37,7 @@ impl Source for ThrSource {
         &self,
         _context: &mut zenoh_flow::Context,
         state: &mut Box<dyn zenoh_flow::State>,
-    ) -> ZFResult<(PortId, SerDeData)> {
+    ) -> ZFResult<SerDeData> {
         let real_state = downcast!(ThrSourceState, state).unwrap();
 
         async_std::task::sleep(Duration::from_secs_f64(real_state.interveal)).await;
@@ -51,7 +49,7 @@ impl Source for ThrSource {
             ts,
         };
 
-        Ok((PortId::from(SOURCE), zf_data!(data)))
+        Ok(zf_data!(data))
     }
 }
 

@@ -20,8 +20,8 @@ sinks:
 
 links:
 - from:
-    component : LatSource
+    node : LatSource
     output : Data
   to:
-    component : LatSink
+    node : LatSink
     input : Data

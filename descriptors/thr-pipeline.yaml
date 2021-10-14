@@ -19,8 +19,8 @@ sinks:
 
 links:
 - from:
-    component : ThrSource
+    node : ThrSource
     output : Data
   to:
-    component : ThrSink
+    node : ThrSink
     input : Data

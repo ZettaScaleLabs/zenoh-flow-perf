@@ -18,8 +18,8 @@ use zenoh_flow::async_std::sync::Arc;
 use zenoh_flow::runtime::message::DataMessage;
 use zenoh_flow::zenoh_flow_derive::ZFState;
 use zenoh_flow::{
-    default_input_rule, export_sink, get_input, types::ZFResult, Component, InputRule, PortId,
-    State, Token,
+    default_input_rule, export_sink, types::ZFResult, Node, PortId,
+    ZFState, Token, Data,
 };
 use zenoh_flow::{Context, Sink};
 use zenoh_flow_perf::{get_epoch_us, LatData};
@@ -38,11 +38,12 @@ impl Sink for ThrSink {
     async fn run(
         &self,
         _context: &mut Context,
-        _state: &mut Box<dyn State>,
-        inputs: &mut HashMap<PortId, DataMessage>,
+        _state: &mut Box<dyn ZFState>,
+        mut input: DataMessage,
     ) -> ZFResult<()> {
         // let state = downcast!(SinkState, state).unwrap();
-        let (_, data) = get_input!(LatData, String::from(INPUT), inputs)?;
+
+        let data = input.data.try_get::<LatData>()?;
 
         let now = get_epoch_us();
 
@@ -61,8 +62,8 @@ impl Sink for ThrSink {
     }
 }
 
-impl Component for ThrSink {
-    fn initialize(&self, configuration: &Option<HashMap<String, String>>) -> Box<dyn State> {
+impl Node for ThrSink {
+    fn initialize(&self, configuration: &Option<HashMap<String, String>>) -> Box<dyn ZFState> {
         let payload_size = match configuration {
             Some(conf) => conf.get("payload_size").unwrap().parse::<usize>().unwrap(),
             None => 8usize,
@@ -71,19 +72,8 @@ impl Component for ThrSink {
         Box::new(SinkState { payload_size })
     }
 
-    fn clean(&self, _state: &mut Box<dyn State>) -> ZFResult<()> {
+    fn clean(&self, _state: &mut Box<dyn ZFState>) -> ZFResult<()> {
         Ok(())
-    }
-}
-
-impl InputRule for ThrSink {
-    fn input_rule(
-        &self,
-        _context: &mut Context,
-        state: &mut Box<dyn State>,
-        tokens: &mut HashMap<PortId, Token>,
-    ) -> ZFResult<bool> {
-        default_input_rule(state, tokens)
     }
 }
 

@@ -16,9 +16,9 @@ use async_std::sync::Arc;
 use async_trait::async_trait;
 use std::collections::HashMap;
 use std::time::Duration;
-use zenoh_flow::{default_output_rule, Component, OutputRule, Source};
+use zenoh_flow::{default_output_rule, Node, Source};
 use zenoh_flow::{
-    downcast, types::ZFResult, zenoh_flow_derive::ZFState, zf_data, PortId, SerDeData, State,
+    downcast, types::ZFResult, zenoh_flow_derive::ZFState, PortId, Data, ZFState,
 };
 use zenoh_flow_perf::{get_epoch_us, LatData};
 
@@ -38,9 +38,8 @@ impl Source for ThrSource {
     async fn run(
         &self,
         _context: &mut zenoh_flow::Context,
-        state: &mut Box<dyn zenoh_flow::State>,
-    ) -> ZFResult<HashMap<PortId, SerDeData>> {
-        let mut results: HashMap<PortId, SerDeData> = HashMap::new();
+        state: &mut Box<dyn zenoh_flow::ZFState>,
+    ) -> ZFResult<Data> {
         let real_state = downcast!(ThrSourceState, state).unwrap();
 
         async_std::task::sleep(Duration::from_secs_f64(real_state.interveal)).await;
@@ -51,28 +50,16 @@ impl Source for ThrSource {
             data: real_state.data.clone(),
             ts,
         };
-
-        results.insert(PortId::from(SOURCE), zf_data!(data));
-        Ok(results)
+        Ok(Data::from::<LatData>(data))
     }
 }
 
-impl OutputRule for ThrSource {
-    fn output_rule(
-        &self,
-        _context: &mut zenoh_flow::Context,
-        state: &mut Box<dyn zenoh_flow::State>,
-        outputs: HashMap<PortId, SerDeData>,
-    ) -> ZFResult<HashMap<zenoh_flow::PortId, zenoh_flow::ComponentOutput>> {
-        default_output_rule(state, outputs)
-    }
-}
 
-impl Component for ThrSource {
+impl Node for ThrSource {
     fn initialize(
         &self,
         configuration: &Option<HashMap<String, String>>,
-    ) -> Box<dyn zenoh_flow::State> {
+    ) -> Box<dyn zenoh_flow::ZFState> {
         let payload_size = match configuration {
             Some(conf) => conf.get("payload_size").unwrap().parse::<usize>().unwrap(),
             None => 8usize,
@@ -90,7 +77,7 @@ impl Component for ThrSource {
         Box::new(ThrSourceState { data, interveal })
     }
 
-    fn clean(&self, _state: &mut Box<dyn State>) -> ZFResult<()> {
+    fn clean(&self, _state: &mut Box<dyn ZFState>) -> ZFResult<()> {
         Ok(())
     }
 }

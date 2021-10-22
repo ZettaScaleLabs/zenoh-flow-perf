@@ -15,14 +15,14 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 use zenoh_flow::serde::{Deserialize, Serialize};
 use zenoh_flow::zenoh_flow_derive::ZFData;
-use zenoh_flow::{Data, Deserializable, ZFError, ZFResult};
+use zenoh_flow::{ZFData, Deserializable, ZFError, ZFResult};
 
 #[derive(Debug, Clone, ZFData, Serialize, Deserialize)]
 pub struct ThrData {
     pub data: Vec<u8>,
 }
 
-impl Data for ThrData {
+impl ZFData for ThrData {
     fn try_serialize(&self) -> zenoh_flow::ZFResult<Vec<u8>> {
         Ok(bincode::serialize(self)
             .map_err(|_| ZFError::SerializationError)?
@@ -45,7 +45,7 @@ pub struct LatData {
     pub ts: u128,
 }
 
-impl Data for LatData {
+impl ZFData for LatData {
     fn try_serialize(&self) -> zenoh_flow::ZFResult<Vec<u8>> {
         Ok(bincode::serialize(self)
             .map_err(|_| ZFError::SerializationError)?

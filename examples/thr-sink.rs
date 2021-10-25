@@ -20,10 +20,7 @@ use std::time::{Duration, Instant};
 use zenoh_flow::async_std::sync::Arc;
 use zenoh_flow::runtime::message::DataMessage;
 use zenoh_flow::zenoh_flow_derive::ZFState;
-use zenoh_flow::{
-    default_input_rule, downcast, downcast_mut, export_sink, types::ZFResult, Node, PortId, Token,
-    ZFState,
-};
+use zenoh_flow::{export_sink, types::ZFResult, Node, State};
 use zenoh_flow::{Context, Sink};
 
 struct ThrSink;
@@ -40,17 +37,17 @@ impl Sink for ThrSink {
     async fn run(
         &self,
         _context: &mut Context,
-        _state: &mut Box<dyn ZFState>,
+        state: &mut State,
         _input: DataMessage,
     ) -> ZFResult<()> {
-        let state = downcast!(SinkState, _state).unwrap();
+        let state = state.try_get::<SinkState>()?;
         state.accumulator.fetch_add(1, Ordering::Relaxed);
         Ok(())
     }
 }
 
 impl Node for ThrSink {
-    fn initialize(&self, configuration: &Option<HashMap<String, String>>) -> Box<dyn ZFState> {
+    fn initialize(&self, configuration: &Option<HashMap<String, String>>) -> State {
         let payload_size = match configuration {
             Some(conf) => conf.get("payload_size").unwrap().parse::<usize>().unwrap(),
             None => 8usize,
@@ -84,15 +81,15 @@ impl Node for ThrSink {
         let (abort_handle, abort_registration) = AbortHandle::new_pair();
         let _print_task = async_std::task::spawn(Abortable::new(print_loop, abort_registration));
 
-        Box::new(SinkState {
+        State::from(SinkState {
             payload_size,
             accumulator,
             abort_handle,
         })
     }
 
-    fn clean(&self, state: &mut Box<dyn ZFState>) -> ZFResult<()> {
-        let real_state = downcast_mut!(SinkState, state).unwrap();
+    fn finalize(&self, state: &mut State) -> ZFResult<()> {
+        let real_state = state.try_get::<SinkState>()?;
 
         real_state.abort_handle.abort();
         Ok(())

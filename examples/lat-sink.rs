@@ -17,9 +17,7 @@ use std::collections::HashMap;
 use zenoh_flow::async_std::sync::Arc;
 use zenoh_flow::runtime::message::DataMessage;
 use zenoh_flow::zenoh_flow_derive::ZFState;
-use zenoh_flow::{
-    default_input_rule, export_sink, types::ZFResult, Data, Node, PortId, Token, ZFState,
-};
+use zenoh_flow::{export_sink, types::ZFResult, Data, Node, PortId, State, Token, ZFState};
 use zenoh_flow::{Context, Sink};
 use zenoh_flow_perf::{get_epoch_us, LatData};
 
@@ -37,7 +35,7 @@ impl Sink for ThrSink {
     async fn run(
         &self,
         _context: &mut Context,
-        _state: &mut Box<dyn ZFState>,
+        _state: &mut State,
         mut input: DataMessage,
     ) -> ZFResult<()> {
         // let state = downcast!(SinkState, state).unwrap();
@@ -62,16 +60,16 @@ impl Sink for ThrSink {
 }
 
 impl Node for ThrSink {
-    fn initialize(&self, configuration: &Option<HashMap<String, String>>) -> Box<dyn ZFState> {
+    fn initialize(&self, configuration: &Option<HashMap<String, String>>) -> State {
         let payload_size = match configuration {
             Some(conf) => conf.get("payload_size").unwrap().parse::<usize>().unwrap(),
             None => 8usize,
         };
 
-        Box::new(SinkState { payload_size })
+        State::from(SinkState { payload_size })
     }
 
-    fn clean(&self, _state: &mut Box<dyn ZFState>) -> ZFResult<()> {
+    fn finalize(&self, _state: &mut State) -> ZFResult<()> {
         Ok(())
     }
 }

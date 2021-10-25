@@ -17,7 +17,7 @@ use async_trait::async_trait;
 use std::collections::HashMap;
 use std::time::Duration;
 use zenoh_flow::{default_output_rule, Node, Source};
-use zenoh_flow::{downcast, types::ZFResult, zenoh_flow_derive::ZFState, Data, PortId, ZFState};
+use zenoh_flow::{types::ZFResult, zenoh_flow_derive::ZFState, Data, PortId, State, ZFState};
 use zenoh_flow_perf::{get_epoch_us, LatData};
 
 static SOURCE: &str = "Data";
@@ -33,12 +33,8 @@ struct ThrSourceState {
 
 #[async_trait]
 impl Source for ThrSource {
-    async fn run(
-        &self,
-        _context: &mut zenoh_flow::Context,
-        state: &mut Box<dyn zenoh_flow::ZFState>,
-    ) -> ZFResult<Data> {
-        let real_state = downcast!(ThrSourceState, state).unwrap();
+    async fn run(&self, _context: &mut zenoh_flow::Context, state: &mut State) -> ZFResult<Data> {
+        let real_state = state.try_get::<ThrSourceState>()?;
 
         async_std::task::sleep(Duration::from_secs_f64(real_state.interveal)).await;
 
@@ -53,10 +49,7 @@ impl Source for ThrSource {
 }
 
 impl Node for ThrSource {
-    fn initialize(
-        &self,
-        configuration: &Option<HashMap<String, String>>,
-    ) -> Box<dyn zenoh_flow::ZFState> {
+    fn initialize(&self, configuration: &Option<HashMap<String, String>>) -> State {
         let payload_size = match configuration {
             Some(conf) => conf.get("payload_size").unwrap().parse::<usize>().unwrap(),
             None => 8usize,
@@ -71,10 +64,10 @@ impl Node for ThrSource {
             .map(|i| (i % 10) as u8)
             .collect::<Vec<u8>>();
 
-        Box::new(ThrSourceState { data, interveal })
+        State::from(ThrSourceState { data, interveal })
     }
 
-    fn clean(&self, _state: &mut Box<dyn ZFState>) -> ZFResult<()> {
+    fn finalize(&self, _state: &mut State) -> ZFResult<()> {
         Ok(())
     }
 }

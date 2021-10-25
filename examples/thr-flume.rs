@@ -40,7 +40,6 @@ async fn main() {
 
     let count: Arc<AtomicU64> = Arc::new(AtomicU64::new(0));
 
-
     let (sender, receiver) = flume::unbounded::<Arc<Vec<u8>>>();
     println!("layer,scenario,test,name,size,messages");
 
@@ -52,10 +51,7 @@ async fn main() {
             task::sleep(Duration::from_secs(i)).await;
             let n = c.swap(0, Ordering::AcqRel);
             let msgs = n / i;
-            println!(
-                "flume,same-runtime,throughput,test-name,{},{}",
-                s, msgs
-            );
+            println!("flume,same-runtime,throughput,test-name,{},{}", s, msgs);
         }
     });
 

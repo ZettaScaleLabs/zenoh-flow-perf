@@ -23,7 +23,7 @@ typetag = "0.1"
 log = "0.4"
 bincode = "1"
 zenoh = { git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "master" }
-uhlc = { git = "https://github.com/atolab/uhlc-rs.git", branch = "master" }
+uhlc = "0.3"
 
 [dev-dependencies]
 rand = "0.8.0"
@@ -36,6 +36,7 @@ async-ctrlc ={version = "1.2.0", features = ["stream"]}
 async-trait = "0.1.50"
 structopt = "0.3.13"
 clap = "2.33"
+uuid = { version = "0.8", features = ["serde", "v4"] }
 
 [[example]]
 name = "thr-source"

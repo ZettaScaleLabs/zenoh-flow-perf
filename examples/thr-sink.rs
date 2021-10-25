@@ -21,8 +21,8 @@ use zenoh_flow::async_std::sync::Arc;
 use zenoh_flow::runtime::message::DataMessage;
 use zenoh_flow::zenoh_flow_derive::ZFState;
 use zenoh_flow::{
-    default_input_rule, downcast, downcast_mut, export_sink, types::ZFResult, Node,
-    PortId, ZFState, Token,
+    default_input_rule, downcast, downcast_mut, export_sink, types::ZFResult, Node, PortId, Token,
+    ZFState,
 };
 use zenoh_flow::{Context, Sink};
 
@@ -98,7 +98,6 @@ impl Node for ThrSink {
         Ok(())
     }
 }
-
 
 export_sink!(register);
 

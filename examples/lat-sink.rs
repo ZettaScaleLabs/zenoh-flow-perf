@@ -18,8 +18,7 @@ use zenoh_flow::async_std::sync::Arc;
 use zenoh_flow::runtime::message::DataMessage;
 use zenoh_flow::zenoh_flow_derive::ZFState;
 use zenoh_flow::{
-    default_input_rule, export_sink, types::ZFResult, Node, PortId,
-    ZFState, Token, Data,
+    default_input_rule, export_sink, types::ZFResult, Data, Node, PortId, Token, ZFState,
 };
 use zenoh_flow::{Context, Sink};
 use zenoh_flow_perf::{get_epoch_us, LatData};

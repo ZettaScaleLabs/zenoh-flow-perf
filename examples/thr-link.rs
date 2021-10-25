@@ -21,7 +21,7 @@ use zenoh_flow::runtime::graph::link::link;
 static DEFAULT_INT: &str = "1";
 static DEFAULT_SIZE: &str = "8";
 static DEFAULT_DURATION: &str = "60";
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 #[derive(StructOpt, Debug)]
 struct CallArgs {

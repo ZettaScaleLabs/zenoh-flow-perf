@@ -16,9 +16,7 @@ use async_std::sync::Arc;
 use async_trait::async_trait;
 use std::collections::HashMap;
 use zenoh_flow::{default_output_rule, Node, Source};
-use zenoh_flow::{
-    downcast, types::ZFResult, zenoh_flow_derive::ZFState, PortId, Data, ZFState,
-};
+use zenoh_flow::{downcast, types::ZFResult, zenoh_flow_derive::ZFState, Data, PortId, ZFState};
 use zenoh_flow_perf::ThrData;
 
 static SOURCE: &str = "Data";

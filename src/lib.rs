@@ -15,7 +15,7 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 use zenoh_flow::serde::{Deserialize, Serialize};
 use zenoh_flow::zenoh_flow_derive::ZFData;
-use zenoh_flow::{ZFData, Deserializable, ZFError, ZFResult};
+use zenoh_flow::{Deserializable, ZFData, ZFError, ZFResult};
 
 #[derive(Debug, Clone, ZFData, Serialize, Deserialize)]
 pub struct ThrData {

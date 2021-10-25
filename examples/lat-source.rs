@@ -17,9 +17,7 @@ use async_trait::async_trait;
 use std::collections::HashMap;
 use std::time::Duration;
 use zenoh_flow::{default_output_rule, Node, Source};
-use zenoh_flow::{
-    downcast, types::ZFResult, zenoh_flow_derive::ZFState, PortId, Data, ZFState,
-};
+use zenoh_flow::{downcast, types::ZFResult, zenoh_flow_derive::ZFState, Data, PortId, ZFState};
 use zenoh_flow_perf::{get_epoch_us, LatData};
 
 static SOURCE: &str = "Data";
@@ -53,7 +51,6 @@ impl Source for ThrSource {
         Ok(Data::from::<LatData>(data))
     }
 }
-
 
 impl Node for ThrSource {
     fn initialize(

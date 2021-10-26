@@ -41,7 +41,7 @@ async fn main() {
     let count: Arc<AtomicU64> = Arc::new(AtomicU64::new(0));
 
     let (sender, receiver) = flume::unbounded::<Arc<Vec<u8>>>();
-    println!("layer,scenario,test,name,size,messages");
+    // println!("layer,scenario,test,name,size,messages");
 
     let c = count.clone();
     let i = args.interveal.clone();

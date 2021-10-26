@@ -45,7 +45,7 @@ async fn main() {
 
     task::spawn(async move {
         while let Ok((_, data)) = receiver.recv().await {
-            let elapsed = data.0.elapsed().as_micros() as u64;
+            let elapsed = data.0.elapsed().as_nanos() as u64;
 
             println!(
                 "zenoh-flow-link,scenario-name,latency,test-name,{},y,x,{}",

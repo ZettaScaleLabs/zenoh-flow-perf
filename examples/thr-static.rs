@@ -120,7 +120,7 @@ impl Node for ThrSink {
         let loop_payload_size = payload_size.clone();
 
         let print_loop = async move {
-            println!("layer,scenario,test,name,size,messages");
+            // println!("layer,scenario,test,name,size,messages");
             loop {
                 let now = Instant::now();
                 async_std::task::sleep(Duration::from_secs(1)).await;
@@ -181,12 +181,10 @@ impl Operator for NoOp {
         let mut results: HashMap<PortId, Data> = HashMap::new();
 
         let data = inputs
-            .get_mut(PORT)
-            .ok_or_else(|| ZFError::InvalidData("No data".to_string()))?
-            .data
-            .try_get::<ThrData>()?;
+            .remove(PORT)
+            .ok_or_else(|| ZFError::InvalidData("No data".to_string()))?;
 
-        results.insert(PORT.into(), Data::from::<ThrData>(data.clone()));
+        results.insert(PORT.into(), data.data);
         Ok(results)
     }
 
@@ -321,9 +319,4 @@ async fn main() {
 
     zenoh_flow::async_std::task::sleep(std::time::Duration::from_secs(args.duration)).await;
 
-    for m in managers.iter() {
-        m.kill().await.unwrap()
-    }
-
-    futures::future::join_all(managers).await;
 }

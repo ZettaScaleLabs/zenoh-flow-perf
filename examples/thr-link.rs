@@ -44,7 +44,7 @@ async fn main() {
     let send_id = String::from("0");
     let recv_id = String::from("10");
     let (sender, receiver) = link::<Vec<u8>>(None, send_id, recv_id);
-    println!("layer,scenario,test,name,size,messages");
+    // println!("layer,scenario,test,name,size,messages");
 
     let c = count.clone();
     let i = args.interveal.clone();
@@ -55,7 +55,7 @@ async fn main() {
             let n = c.swap(0, Ordering::AcqRel);
             let msgs = n / i;
             println!(
-                "zenoh-flow,same-runtime,throughput,test-name,{},{}",
+                "zenoh-flow-link,same-runtime,throughput,test-name,{},{}",
                 s, msgs
             );
         }

@@ -14,13 +14,12 @@
 
 use async_trait::async_trait;
 use futures::future::{AbortHandle, Abortable};
-use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 use zenoh_flow::async_std::sync::Arc;
 use zenoh_flow::runtime::message::DataMessage;
 use zenoh_flow::zenoh_flow_derive::ZFState;
-use zenoh_flow::{export_sink, types::ZFResult, Node, State};
+use zenoh_flow::{export_sink, types::ZFResult, Configuration, Node, State};
 use zenoh_flow::{Context, Sink};
 
 struct ThrSink;
@@ -47,9 +46,9 @@ impl Sink for ThrSink {
 }
 
 impl Node for ThrSink {
-    fn initialize(&self, configuration: &Option<HashMap<String, String>>) -> State {
+    fn initialize(&self, configuration: &Option<Configuration>) -> ZFResult<State> {
         let payload_size = match configuration {
-            Some(conf) => conf.get("payload_size").unwrap().parse::<usize>().unwrap(),
+            Some(conf) => conf["payload_size"].as_u64().unwrap() as usize,
             None => 8usize,
         };
 
@@ -81,11 +80,11 @@ impl Node for ThrSink {
         let (abort_handle, abort_registration) = AbortHandle::new_pair();
         let _print_task = async_std::task::spawn(Abortable::new(print_loop, abort_registration));
 
-        State::from(SinkState {
+        Ok(State::from(SinkState {
             payload_size,
             accumulator,
             abort_handle,
-        })
+        }))
     }
 
     fn finalize(&self, state: &mut State) -> ZFResult<()> {

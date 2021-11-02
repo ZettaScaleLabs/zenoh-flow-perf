@@ -20,11 +20,13 @@ use std::time::{Duration, Instant};
 use structopt::StructOpt;
 use zenoh_flow::async_std::sync::Arc;
 use zenoh_flow::model::link::{LinkFromDescriptor, LinkToDescriptor};
+use zenoh_flow::runtime::dataflow::instance::DataflowInstance;
 use zenoh_flow::runtime::RuntimeContext;
 use zenoh_flow::zenoh_flow_derive::ZFState;
 use zenoh_flow::{
-    default_input_rule, default_output_rule, model::link::PortDescriptor, zf_empty_state, Context,
-    Data, Node, NodeOutput, Operator, PortId, Sink, Source, State, ZFError, ZFResult,
+    default_input_rule, default_output_rule, model::link::PortDescriptor, zf_empty_state,
+    Configuration, Context, Data, Node, NodeOutput, Operator, PortId, Sink, Source, State, ZFError,
+    ZFResult,
 };
 use zenoh_flow_perf::ThrData;
 
@@ -47,7 +49,7 @@ struct ThrSource;
 
 #[derive(Debug, ZFState)]
 struct ThrSourceState {
-    pub data: Vec<u8>,
+    pub data: Arc<ThrData>,
 }
 
 #[async_trait]
@@ -55,26 +57,26 @@ impl Source for ThrSource {
     async fn run(&self, _context: &mut Context, state: &mut State) -> zenoh_flow::ZFResult<Data> {
         let real_state = state.try_get::<ThrSourceState>()?;
 
-        let data = ThrData {
-            data: real_state.data.clone(),
-        };
+        let data = real_state.data.clone();
 
-        Ok(Data::from::<ThrData>(data))
+        Ok(Data::from_arc::<ThrData>(data))
     }
 }
 
 impl Node for ThrSource {
-    fn initialize(&self, configuration: &Option<HashMap<String, String>>) -> State {
+    fn initialize(&self, configuration: &Option<Configuration>) -> ZFResult<State> {
         let payload_size = match configuration {
-            Some(conf) => conf.get("payload_size").unwrap().parse::<usize>().unwrap(),
+            Some(conf) => conf["payload_size"].as_u64().unwrap() as usize,
             None => 8usize,
         };
 
-        let data = (0usize..payload_size)
-            .map(|i| (i % 10) as u8)
-            .collect::<Vec<u8>>();
+        let data = Arc::new(ThrData {
+            data: (0usize..payload_size)
+                .map(|i| (i % 10) as u8)
+                .collect::<Vec<u8>>(),
+        });
 
-        State::from(ThrSourceState { data })
+        Ok(State::from(ThrSourceState { data }))
     }
 
     fn finalize(&self, _state: &mut State) -> ZFResult<()> {
@@ -108,9 +110,9 @@ impl Sink for ThrSink {
 }
 
 impl Node for ThrSink {
-    fn initialize(&self, configuration: &Option<HashMap<String, String>>) -> State {
+    fn initialize(&self, configuration: &Option<Configuration>) -> ZFResult<State> {
         let payload_size = match configuration {
-            Some(conf) => conf.get("payload_size").unwrap().parse::<usize>().unwrap(),
+            Some(conf) => conf["payload_size"].as_u64().unwrap() as usize,
             None => 8usize,
         };
 
@@ -142,11 +144,11 @@ impl Node for ThrSink {
         let (abort_handle, abort_registration) = AbortHandle::new_pair();
         let _print_task = async_std::task::spawn(Abortable::new(print_loop, abort_registration));
 
-        State::from(SinkState {
+        Ok(State::from(SinkState {
             payload_size,
             accumulator,
             abort_handle,
-        })
+        }))
     }
 
     fn finalize(&self, state: &mut State) -> ZFResult<()> {
@@ -199,7 +201,7 @@ impl Operator for NoOp {
 }
 
 impl Node for NoOp {
-    fn initialize(&self, _configuration: &Option<HashMap<String, String>>) -> State {
+    fn initialize(&self, _configuration: &Option<Configuration>) -> ZFResult<State> {
         zf_empty_state!()
     }
 
@@ -226,54 +228,50 @@ async fn main() {
         runtime_uuid: rt_uuid,
     };
 
-    let mut zf_graph = zenoh_flow::runtime::graph::DataFlowGraph::new(ctx.clone());
+    let mut zf_graph =
+        zenoh_flow::runtime::dataflow::Dataflow::new(ctx.clone(), "thr-static".into(), None);
 
     let source = Arc::new(ThrSource {});
     let sink = Arc::new(ThrSink {});
     let operator = Arc::new(NoOp {});
 
-    let mut config = HashMap::new();
-    config.insert("payload_size".to_string(), format!("{}", args.size));
+    let config = serde_json::json!({"payload_size" : args.size});
+    let config = Some(config);
 
-    zf_graph
-        .add_static_source(
-            "thr-source".into(),
-            PortDescriptor {
-                port_id: String::from(PORT),
-                port_type: String::from("thr"),
-            },
-            source,
-            Some(config.clone()),
-        )
-        .unwrap();
+    zf_graph.add_static_source(
+        "thr-source".into(),
+        None,
+        PortDescriptor {
+            port_id: String::from(PORT),
+            port_type: String::from("thr"),
+        },
+        source.initialize(&config).unwrap(),
+        source,
+    );
 
-    zf_graph
-        .add_static_sink(
-            "thr-sink".into(),
-            PortDescriptor {
-                port_id: String::from(PORT),
-                port_type: String::from("thr"),
-            },
-            sink,
-            Some(config),
-        )
-        .unwrap();
+    zf_graph.add_static_sink(
+        "thr-sink".into(),
+        PortDescriptor {
+            port_id: String::from(PORT),
+            port_type: String::from("thr"),
+        },
+        sink.initialize(&config).unwrap(),
+        sink,
+    );
 
-    zf_graph
-        .add_static_operator(
-            "noop".into(),
-            vec![PortDescriptor {
-                port_id: String::from(PORT),
-                port_type: String::from("thr"),
-            }],
-            vec![PortDescriptor {
-                port_id: String::from(PORT),
-                port_type: String::from("thr"),
-            }],
-            operator,
-            None,
-        )
-        .unwrap();
+    zf_graph.add_static_operator(
+        "noop".into(),
+        vec![PortDescriptor {
+            port_id: String::from(PORT),
+            port_type: String::from("thr"),
+        }],
+        vec![PortDescriptor {
+            port_id: String::from(PORT),
+            port_type: String::from("thr"),
+        }],
+        operator.initialize(&None).unwrap(),
+        operator,
+    );
 
     zf_graph
         .add_link(
@@ -307,16 +305,15 @@ async fn main() {
         )
         .unwrap();
 
-    zf_graph.make_connections().await.unwrap();
+    let instance = DataflowInstance::try_instantiate(zf_graph).unwrap();
 
     let mut managers = vec![];
 
-    let runners = zf_graph.get_runners();
+    let runners = instance.get_runners();
     for runner in &runners {
         let m = runner.start();
         managers.push(m)
     }
 
     zenoh_flow::async_std::task::sleep(std::time::Duration::from_secs(args.duration)).await;
-
 }

@@ -14,12 +14,9 @@
 
 use async_std::sync::Arc;
 use async_trait::async_trait;
-use std::collections::HashMap;
-use zenoh_flow::{types::ZFResult, zenoh_flow_derive::ZFState, Data, PortId, State};
+use zenoh_flow::{types::ZFResult, zenoh_flow_derive::ZFState, Configuration, Data, State};
 use zenoh_flow::{Node, Source};
 use zenoh_flow_perf::ThrData;
-
-static SOURCE: &str = "Data";
 
 #[derive(Debug)]
 struct ThrSource;
@@ -43,9 +40,9 @@ impl Source for ThrSource {
 }
 
 impl Node for ThrSource {
-    fn initialize(&self, configuration: &Option<HashMap<String, String>>) -> State {
+    fn initialize(&self, configuration: &Option<Configuration>) -> ZFResult<State> {
         let payload_size = match configuration {
-            Some(conf) => conf.get("payload_size").unwrap().parse::<usize>().unwrap(),
+            Some(conf) => conf["payload_size"].as_u64().unwrap() as usize,
             None => 8usize,
         };
 
@@ -53,7 +50,7 @@ impl Node for ThrSource {
             .map(|i| (i % 10) as u8)
             .collect::<Vec<u8>>();
 
-        State::from(ThrSourceState { data })
+        Ok(State::from(ThrSourceState { data }))
     }
 
     fn finalize(&self, _state: &mut State) -> ZFResult<()> {

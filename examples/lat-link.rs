@@ -15,7 +15,7 @@
 use structopt::StructOpt;
 use zenoh_flow::async_std::sync::Arc;
 use zenoh_flow::async_std::task;
-use zenoh_flow::runtime::graph::link::link;
+use zenoh_flow::runtime::dataflow::instance::link::link;
 
 static DEFAULT_INT: &str = "1";
 static DEFAULT_SIZE: &str = "8";

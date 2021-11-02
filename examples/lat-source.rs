@@ -14,13 +14,12 @@
 
 use async_std::sync::Arc;
 use async_trait::async_trait;
-use std::collections::HashMap;
 use std::time::Duration;
-use zenoh_flow::{default_output_rule, Node, Source};
-use zenoh_flow::{types::ZFResult, zenoh_flow_derive::ZFState, Data, PortId, State, ZFState};
+use zenoh_flow::{
+    types::ZFResult, zenoh_flow_derive::ZFState, Configuration, Data, State,
+};
+use zenoh_flow::{Node, Source};
 use zenoh_flow_perf::{get_epoch_us, LatData};
-
-static SOURCE: &str = "Data";
 
 #[derive(Debug)]
 struct ThrSource;
@@ -49,14 +48,14 @@ impl Source for ThrSource {
 }
 
 impl Node for ThrSource {
-    fn initialize(&self, configuration: &Option<HashMap<String, String>>) -> State {
+    fn initialize(&self, configuration: &Option<Configuration>) -> ZFResult<State> {
         let payload_size = match configuration {
-            Some(conf) => conf.get("payload_size").unwrap().parse::<usize>().unwrap(),
+            Some(conf) => conf["payload_size"].as_u64().unwrap() as usize,
             None => 8usize,
         };
 
         let interveal = match configuration {
-            Some(conf) => conf.get("interveal").unwrap().parse::<f64>().unwrap(),
+            Some(conf) => conf["interveal"].as_f64().unwrap(),
             None => 1f64,
         };
 
@@ -64,7 +63,7 @@ impl Node for ThrSource {
             .map(|i| (i % 10) as u8)
             .collect::<Vec<u8>>();
 
-        State::from(ThrSourceState { data, interveal })
+        Ok(State::from(ThrSourceState { data, interveal }))
     }
 
     fn finalize(&self, _state: &mut State) -> ZFResult<()> {

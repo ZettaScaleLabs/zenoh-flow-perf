@@ -13,15 +13,12 @@
 //
 
 use async_trait::async_trait;
-use std::collections::HashMap;
 use zenoh_flow::async_std::sync::Arc;
 use zenoh_flow::runtime::message::DataMessage;
 use zenoh_flow::zenoh_flow_derive::ZFState;
-use zenoh_flow::{export_sink, types::ZFResult, Data, Node, PortId, State, Token, ZFState};
+use zenoh_flow::{export_sink, types::ZFResult, Configuration, Node, State};
 use zenoh_flow::{Context, Sink};
 use zenoh_flow_perf::{get_epoch_us, LatData};
-
-static INPUT: &str = "Data";
 
 struct ThrSink;
 
@@ -60,13 +57,13 @@ impl Sink for ThrSink {
 }
 
 impl Node for ThrSink {
-    fn initialize(&self, configuration: &Option<HashMap<String, String>>) -> State {
+    fn initialize(&self, configuration: &Option<Configuration>) -> ZFResult<State> {
         let payload_size = match configuration {
-            Some(conf) => conf.get("payload_size").unwrap().parse::<usize>().unwrap(),
+            Some(conf) => conf["payload_size"].as_u64().unwrap() as usize,
             None => 8usize,
         };
 
-        State::from(SinkState { payload_size })
+        Ok(State::from(SinkState { payload_size }))
     }
 
     fn finalize(&self, _state: &mut State) -> ZFResult<()> {

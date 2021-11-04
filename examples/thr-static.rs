@@ -242,8 +242,8 @@ async fn main() {
         "thr-source".into(),
         None,
         PortDescriptor {
-            port_id: String::from(PORT),
-            port_type: String::from("thr"),
+            port_id: String::from(PORT).into(),
+            port_type: String::from("thr").into(),
         },
         source.initialize(&config).unwrap(),
         source,
@@ -252,8 +252,8 @@ async fn main() {
     zf_graph.add_static_sink(
         "thr-sink".into(),
         PortDescriptor {
-            port_id: String::from(PORT),
-            port_type: String::from("thr"),
+            port_id: String::from(PORT).into(),
+            port_type: String::from("thr").into(),
         },
         sink.initialize(&config).unwrap(),
         sink,
@@ -262,12 +262,12 @@ async fn main() {
     zf_graph.add_static_operator(
         "noop".into(),
         vec![PortDescriptor {
-            port_id: String::from(PORT),
-            port_type: String::from("thr"),
+            port_id: String::from(PORT).into(),
+            port_type: String::from("thr").into(),
         }],
         vec![PortDescriptor {
-            port_id: String::from(PORT),
-            port_type: String::from("thr"),
+            port_id: String::from(PORT).into(),
+            port_type: String::from("thr").into(),
         }],
         operator.initialize(&None).unwrap(),
         operator,
@@ -277,11 +277,11 @@ async fn main() {
         .add_link(
             LinkFromDescriptor {
                 node: "thr-source".into(),
-                output: String::from(PORT),
+                output: String::from(PORT).into(),
             },
             LinkToDescriptor {
                 node: "noop".into(),
-                input: String::from(PORT),
+                input: String::from(PORT).into(),
             },
             None,
             None,
@@ -293,11 +293,11 @@ async fn main() {
         .add_link(
             LinkFromDescriptor {
                 node: "noop".into(),
-                output: String::from(PORT),
+                output: String::from(PORT).into(),
             },
             LinkToDescriptor {
                 node: "thr-sink".into(),
-                input: String::from(PORT),
+                input: String::from(PORT).into(),
             },
             None,
             None,

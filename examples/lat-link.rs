@@ -41,7 +41,7 @@ async fn main() {
 
     let send_id = String::from("0");
     let recv_id = String::from("10");
-    let (sender, receiver) = link::<(Instant, Arc<Vec<u8>>)>(None, send_id, recv_id);
+    let (sender, receiver) = link::<(Instant, Arc<Vec<u8>>)>(None, send_id.into(), recv_id.into());
 
     task::spawn(async move {
         while let Ok((_, data)) = receiver.recv().await {

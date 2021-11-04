@@ -43,7 +43,7 @@ async fn main() {
 
     let send_id = String::from("0");
     let recv_id = String::from("10");
-    let (sender, receiver) = link::<Vec<u8>>(None, send_id, recv_id);
+    let (sender, receiver) = link::<Vec<u8>>(None, send_id.into(), recv_id.into());
     // println!("layer,scenario,test,name,size,messages");
 
     let c = count.clone();

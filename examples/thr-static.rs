@@ -14,6 +14,8 @@
 
 use async_trait::async_trait;
 use futures::future::{AbortHandle, Abortable};
+use zenoh_flow::DeadlineMiss;
+use zenoh_flow::runtime::dataflow::loader::{Loader, LoaderConfig};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
@@ -195,6 +197,7 @@ impl Operator for NoOp {
         _context: &mut zenoh_flow::Context,
         state: &mut State,
         outputs: HashMap<PortId, Data>,
+        deadline_miss: Option<DeadlineMiss>,
     ) -> zenoh_flow::ZFResult<HashMap<zenoh_flow::PortId, NodeOutput>> {
         default_output_rule(state, outputs)
     }
@@ -224,6 +227,7 @@ async fn main() {
     let ctx = RuntimeContext {
         session,
         hlc,
+        loader: Arc::new(Loader::new(LoaderConfig { extensions: vec![] })),
         runtime_name: format!("thr-runtime-{}", rt_uuid).into(),
         runtime_uuid: rt_uuid,
     };
@@ -269,6 +273,7 @@ async fn main() {
             port_id: String::from(PORT).into(),
             port_type: String::from("thr").into(),
         }],
+        None,
         operator.initialize(&None).unwrap(),
         operator,
     );

@@ -64,6 +64,6 @@ async fn main() {
         task::sleep(Duration::from_secs_f64(args.interveal)).await;
         let now_s = Instant::now();
         let d = (now_s, Arc::clone(&data));
-        sender.send_async(d).await;
+        sender.send_async(d).await.unwrap();
     }
 }

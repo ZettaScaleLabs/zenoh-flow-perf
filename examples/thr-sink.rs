@@ -26,7 +26,7 @@ struct ThrSink;
 
 #[derive(ZFState, Debug, Clone)]
 struct SinkState {
-    pub payload_size: usize,
+    pub _payload_size: usize,
     pub accumulator: Arc<AtomicUsize>,
     pub abort_handle: AbortHandle,
 }
@@ -81,7 +81,7 @@ impl Node for ThrSink {
         let _print_task = async_std::task::spawn(Abortable::new(print_loop, abort_registration));
 
         Ok(State::from(SinkState {
-            payload_size,
+            _payload_size: payload_size,
             accumulator,
             abort_handle,
         }))

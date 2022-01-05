@@ -24,7 +24,7 @@ struct ThrSink;
 
 #[derive(ZFState, Debug, Clone)]
 struct SinkState {
-    pub payload_size: usize,
+    pub _payload_size: usize,
 }
 
 #[async_trait]
@@ -63,7 +63,7 @@ impl Node for ThrSink {
             None => 8usize,
         };
 
-        Ok(State::from(SinkState { payload_size }))
+        Ok(State::from(SinkState { _payload_size: payload_size }))
     }
 
     fn finalize(&self, _state: &mut State) -> ZFResult<()> {

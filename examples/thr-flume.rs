@@ -70,6 +70,6 @@ async fn main() {
     let data = Arc::new(vec![0; args.size as usize]);
 
     loop {
-        sender.send_async(Arc::clone(&data)).await;
+        sender.send_async(Arc::clone(&data)).await.unwrap();
     }
 }

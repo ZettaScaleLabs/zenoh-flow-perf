@@ -68,3 +68,25 @@ pub fn get_epoch_us() -> u128 {
         .unwrap()
         .as_micros()
 }
+
+#[derive(Debug, Clone, ZFData, Serialize, Deserialize)]
+pub struct Latency {
+    pub ts: u128,
+}
+
+impl ZFData for Latency {
+    fn try_serialize(&self) -> zenoh_flow::ZFResult<Vec<u8>> {
+        Ok(bincode::serialize(self)
+            .map_err(|_| ZFError::SerializationError)?
+            .to_vec())
+    }
+}
+
+impl Deserializable for Latency {
+    fn try_deserialize(bytes: &[u8]) -> ZFResult<Latency>
+    where
+        Self: Sized,
+    {
+        bincode::deserialize::<Latency>(bytes).map_err(|_| ZFError::DeseralizationError)
+    }
+}

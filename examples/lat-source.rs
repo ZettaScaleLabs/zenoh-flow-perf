@@ -15,9 +15,7 @@
 use async_std::sync::Arc;
 use async_trait::async_trait;
 use std::time::Duration;
-use zenoh_flow::{
-    types::ZFResult, zenoh_flow_derive::ZFState, Configuration, Data, State,
-};
+use zenoh_flow::{types::ZFResult, zenoh_flow_derive::ZFState, Configuration, Data, State};
 use zenoh_flow::{Node, Source};
 use zenoh_flow_perf::{get_epoch_us, LatData};
 

@@ -13,10 +13,8 @@
 //
 
 use async_trait::async_trait;
-use futures::future::{AbortHandle, Abortable};
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use structopt::StructOpt;
 use zenoh_flow::async_std::sync::Arc;
 use zenoh_flow::model::link::{LinkFromDescriptor, LinkToDescriptor};
@@ -30,55 +28,51 @@ use zenoh_flow::{
     Configuration, Context, Data, Node, NodeOutput, Operator, PortId, Sink, Source, State, ZFError,
     ZFResult,
 };
-use zenoh_flow_perf::ThrData;
+use zenoh_flow_perf::{get_epoch_us, Latency};
 
-static DEFAULT_SIZE: &str = "8";
-static DEFAULT_DURATION: &str = "60";
+static DEFAULT_PIPELINE: &str = "1";
+static DEFAULT_MSGS: &str = "1";
 static PORT: &str = "Data";
 
 #[derive(StructOpt, Debug)]
 struct CallArgs {
-    #[structopt(short, long, default_value = DEFAULT_SIZE)]
-    size: u64,
-    #[structopt(short, long, default_value = DEFAULT_DURATION)]
-    duration: u64,
+    #[structopt(short, long, default_value = DEFAULT_PIPELINE)]
+    pipeline: u64,
+    #[structopt(short, long, default_value = DEFAULT_MSGS)]
+    msgs: u64,
 }
 
 // SOURCE
 
 #[derive(Debug)]
-struct ThrSource;
+struct LatSource;
 
 #[derive(Debug, ZFState)]
-struct ThrSourceState {
-    pub data: Arc<ThrData>,
+struct LatSourceState {
+    interval: f64,
 }
 
 #[async_trait]
-impl Source for ThrSource {
+impl Source for LatSource {
     async fn run(&self, _context: &mut Context, state: &mut State) -> zenoh_flow::ZFResult<Data> {
-        let real_state = state.try_get::<ThrSourceState>()?;
+        let real_state = state.try_get::<LatSourceState>()?;
 
-        let data = real_state.data.clone();
+        async_std::task::sleep(Duration::from_secs_f64(real_state.interval)).await;
 
-        Ok(Data::from_arc::<ThrData>(data))
+        let msg = Latency { ts: get_epoch_us() };
+
+        Ok(Data::from::<Latency>(msg))
     }
 }
 
-impl Node for ThrSource {
+impl Node for LatSource {
     fn initialize(&self, configuration: &Option<Configuration>) -> ZFResult<State> {
-        let payload_size = match configuration {
-            Some(conf) => conf["payload_size"].as_u64().unwrap() as usize,
-            None => 8usize,
+        let interval = match configuration {
+            Some(conf) => conf["interval"].as_f64().unwrap(),
+            None => 1.0f64,
         };
 
-        let data = Arc::new(ThrData {
-            data: (0usize..payload_size)
-                .map(|i| (i % 10) as u8)
-                .collect::<Vec<u8>>(),
-        });
-
-        Ok(State::from(ThrSourceState { data }))
+        Ok(State::from(LatSourceState { interval }))
     }
 
     fn finalize(&self, _state: &mut State) -> ZFResult<()> {
@@ -88,75 +82,64 @@ impl Node for ThrSource {
 
 // SINK
 
-struct ThrSink;
+struct LatSink;
 
 #[derive(ZFState, Debug, Clone)]
-struct SinkState {
-    pub _payload_size: usize,
-    pub accumulator: Arc<AtomicUsize>,
-    pub abort_handle: AbortHandle,
+struct LatSinkState {
+    pipeline: u64,
+    interval: f64,
+    msgs: u64,
 }
 
 #[async_trait]
-impl Sink for ThrSink {
+impl Sink for LatSink {
     async fn run(
         &self,
         _context: &mut Context,
         state: &mut State,
-        _input: zenoh_flow::runtime::message::DataMessage,
+        mut input: zenoh_flow::runtime::message::DataMessage,
     ) -> zenoh_flow::ZFResult<()> {
-        let my_state = state.try_get::<SinkState>()?;
-        my_state.accumulator.fetch_add(1, Ordering::Relaxed);
+        let real_state = state.try_get::<LatSinkState>()?;
+        let _ = real_state.interval;
+
+        let data = input.data.try_get::<Latency>()?;
+
+        let now = get_epoch_us();
+
+        let elapsed = now - data.ts;
+        let msgs = real_state.msgs;
+        let pipeline = real_state.pipeline;
+        // layer,scenario name,test kind, test name, payload size, msg/s, pipeline size, latency,
+        println!("zenoh-flow,scenario,latency,pipeline,{msgs},{pipeline},{elapsed}");
+
         Ok(())
     }
 }
 
-impl Node for ThrSink {
+impl Node for LatSink {
     fn initialize(&self, configuration: &Option<Configuration>) -> ZFResult<State> {
-        let payload_size = match configuration {
-            Some(conf) => conf["payload_size"].as_u64().unwrap() as usize,
-            None => 8usize,
+        let interval = match configuration {
+            Some(conf) => conf["interval"].as_f64().unwrap(),
+            None => 1.0f64,
         };
 
-        let accumulator = Arc::new(AtomicUsize::new(0usize));
-
-        let loop_accumulator = Arc::clone(&accumulator);
-        let loop_payload_size = payload_size.clone();
-
-        let print_loop = async move {
-            // println!("layer,scenario,test,name,size,messages");
-            loop {
-                let now = Instant::now();
-                async_std::task::sleep(Duration::from_secs(1)).await;
-                let elapsed = now.elapsed().as_micros() as f64;
-
-                let c = loop_accumulator.swap(0, Ordering::Relaxed);
-                if c > 0 {
-                    let interval = 1_000_000.0 / elapsed;
-                    println!(
-                        "zenoh-flow-static,same-runtime,throughput,{},{},{}",
-                        "test-name",
-                        loop_payload_size,
-                        (c as f64 / interval).floor() as usize
-                    );
-                }
-            }
+        let pipeline = match configuration {
+            Some(conf) => conf["pipeline"].as_u64().unwrap(),
+            None => 1u64,
         };
 
-        let (abort_handle, abort_registration) = AbortHandle::new_pair();
-        let _print_task = async_std::task::spawn(Abortable::new(print_loop, abort_registration));
+        let msgs = (1.0 / interval) as u64;
 
-        Ok(State::from(SinkState {
-            _payload_size: payload_size,
-            accumulator,
-            abort_handle,
+        Ok(State::from(LatSinkState {
+            interval,
+            pipeline,
+            msgs,
         }))
     }
 
     fn finalize(&self, state: &mut State) -> ZFResult<()> {
-        let real_state = state.try_get::<SinkState>()?;
+        let _real_state = state.try_get::<LatSinkState>()?;
 
-        real_state.abort_handle.abort();
         Ok(())
     }
 }
@@ -220,6 +203,8 @@ async fn main() {
 
     let args = CallArgs::from_args();
 
+    let interval = 1.0/(args.msgs as f64);
+
     let session =
         async_std::sync::Arc::new(zenoh::net::open(zenoh::net::config::peer()).await.unwrap());
     let hlc = async_std::sync::Arc::new(uhlc::HLC::default());
@@ -233,59 +218,83 @@ async fn main() {
     };
 
     let mut zf_graph =
-        zenoh_flow::runtime::dataflow::Dataflow::new(ctx.clone(), "thr-static".into(), None);
+        zenoh_flow::runtime::dataflow::Dataflow::new(ctx.clone(), "lat-static".into(), None);
 
-    let source = Arc::new(ThrSource {});
-    let sink = Arc::new(ThrSink {});
-    let operator = Arc::new(NoOp {});
+    let source = Arc::new(LatSource {});
+    let sink = Arc::new(LatSink {});
 
-    let config = serde_json::json!({"payload_size" : args.size});
+    let mut operators = vec![];
+
+    for _ in 0..args.pipeline {
+        operators.push(Arc::new(NoOp {}));
+    }
+
+    // let operator = Arc::new(NoOp {});
+
+    let config = serde_json::json!({"interval" : interval, "pipeline":args.pipeline});
     let config = Some(config);
 
     zf_graph.add_static_source(
-        "thr-source".into(),
+        "lat-source".into(),
         None,
         PortDescriptor {
             port_id: String::from(PORT).into(),
-            port_type: String::from("thr").into(),
+            port_type: String::from("lat").into(),
         },
         source.initialize(&config).unwrap(),
         source,
     );
 
     zf_graph.add_static_sink(
-        "thr-sink".into(),
+        "lat-sink".into(),
         PortDescriptor {
             port_id: String::from(PORT).into(),
-            port_type: String::from("thr").into(),
+            port_type: String::from("lat").into(),
         },
         sink.initialize(&config).unwrap(),
         sink,
     );
 
-    zf_graph.add_static_operator(
-        "noop".into(),
-        vec![PortDescriptor {
-            port_id: String::from(PORT).into(),
-            port_type: String::from("thr").into(),
-        }],
-        vec![PortDescriptor {
-            port_id: String::from(PORT).into(),
-            port_type: String::from("thr").into(),
-        }],
-        None,
-        operator.initialize(&None).unwrap(),
-        operator,
-    );
+    for (i, op) in operators.into_iter().enumerate() {
+        zf_graph.add_static_operator(
+            format!("noop{i}").into(),
+            vec![PortDescriptor {
+                port_id: String::from(PORT).into(),
+                port_type: String::from("lat").into(),
+            }],
+            vec![PortDescriptor {
+                port_id: String::from(PORT).into(),
+                port_type: String::from("lat").into(),
+            }],
+            None,
+            op.initialize(&None).unwrap(),
+            op,
+        );
+    }
 
+    // zf_graph.add_static_operator(
+    //     "noop".into(),
+    //     vec![PortDescriptor {
+    //         port_id: String::from(PORT).into(),
+    //         port_type: String::from("lat").into(),
+    //     }],
+    //     vec![PortDescriptor {
+    //         port_id: String::from(PORT).into(),
+    //         port_type: String::from("lat").into(),
+    //     }],
+    //     None,
+    //     operator.initialize(&None).unwrap(),
+    //     operator,
+    // );
+    let mut pipe = String::from("");
     zf_graph
         .add_link(
             LinkFromDescriptor {
-                node: "thr-source".into(),
+                node: "lat-source".into(),
                 output: String::from(PORT).into(),
             },
             LinkToDescriptor {
-                node: "noop".into(),
+                node: format!("noop0").into(),
                 input: String::from(PORT).into(),
             },
             None,
@@ -293,15 +302,39 @@ async fn main() {
             None,
         )
         .unwrap();
+    pipe.push_str(format!("lat-source-->noop0-->").as_str());
 
+    for i in 1..args.pipeline {
+        // println!("Iteration {i}");
+
+        let j = i - 1;
+        zf_graph
+            .add_link(
+                LinkFromDescriptor {
+                    node: format!("noop{j}").into(),
+                    output: String::from(PORT).into(),
+                },
+                LinkToDescriptor {
+                    node: format!("noop{i}").into(),
+                    input: String::from(PORT).into(),
+                },
+                None,
+                None,
+                None,
+            )
+            .unwrap();
+        pipe.push_str(format!("noop{j}-->noop{i}-->").as_str());
+    }
+
+    let len = args.pipeline-1;
     zf_graph
         .add_link(
             LinkFromDescriptor {
-                node: "noop".into(),
+                node: format!("noop{len}").into(),
                 output: String::from(PORT).into(),
             },
             LinkToDescriptor {
-                node: "thr-sink".into(),
+                node: "lat-sink".into(),
                 input: String::from(PORT).into(),
             },
             None,
@@ -309,6 +342,9 @@ async fn main() {
             None,
         )
         .unwrap();
+    pipe.push_str(format!("noop{len}-->lat-sink").as_str());
+
+    // println!("Pipeline is: {pipe}");
 
     let instance = DataflowInstance::try_instantiate(zf_graph).unwrap();
 
@@ -320,5 +356,5 @@ async fn main() {
         managers.push(m)
     }
 
-    zenoh_flow::async_std::task::sleep(std::time::Duration::from_secs(args.duration)).await;
+    let () = std::future::pending().await;
 }

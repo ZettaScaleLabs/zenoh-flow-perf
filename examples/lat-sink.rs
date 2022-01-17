@@ -63,7 +63,9 @@ impl Node for ThrSink {
             None => 8usize,
         };
 
-        Ok(State::from(SinkState { _payload_size: payload_size }))
+        Ok(State::from(SinkState {
+            _payload_size: payload_size,
+        }))
     }
 
     fn finalize(&self, _state: &mut State) -> ZFResult<()> {

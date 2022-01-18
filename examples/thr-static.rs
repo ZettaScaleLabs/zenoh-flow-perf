@@ -19,15 +19,15 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 use structopt::StructOpt;
 use zenoh_flow::async_std::sync::Arc;
-use zenoh_flow::model::link::{LinkFromDescriptor, LinkToDescriptor};
+use zenoh_flow::model::{OutputDescriptor, InputDescriptor};
 use zenoh_flow::runtime::dataflow::instance::DataflowInstance;
 use zenoh_flow::runtime::dataflow::loader::{Loader, LoaderConfig};
 use zenoh_flow::runtime::RuntimeContext;
 use zenoh_flow::zenoh_flow_derive::ZFState;
-use zenoh_flow::DeadlineMiss;
+use zenoh_flow::LocalDeadlineMiss;
 use zenoh_flow::{
     default_input_rule, default_output_rule, model::link::PortDescriptor, zf_empty_state,
-    Configuration, Context, Data, Node, NodeOutput, Operator, PortId, Sink, Source, State, ZFError,
+    Configuration, Context, Data, Node, NodeOutput, Operator, PortId, Sink, Source, State,
     ZFResult,
 };
 use zenoh_flow_perf::ThrData;
@@ -171,7 +171,7 @@ impl Operator for NoOp {
         &self,
         _context: &mut zenoh_flow::Context,
         state: &mut State,
-        tokens: &mut HashMap<PortId, zenoh_flow::Token>,
+        tokens: &mut HashMap<PortId, zenoh_flow::InputToken>,
     ) -> zenoh_flow::ZFResult<bool> {
         default_input_rule(state, tokens)
     }
@@ -185,10 +185,11 @@ impl Operator for NoOp {
         let mut results: HashMap<PortId, Data> = HashMap::new();
 
         let data = inputs
-            .remove(PORT)
-            .ok_or_else(|| ZFError::InvalidData("No data".to_string()))?;
+            .get_mut(PORT)
+            .unwrap()
+            .get_inner_data().clone();
 
-        results.insert(PORT.into(), data.data);
+        results.insert(PORT.into(), data);
         Ok(results)
     }
 
@@ -197,7 +198,7 @@ impl Operator for NoOp {
         _context: &mut zenoh_flow::Context,
         state: &mut State,
         outputs: HashMap<PortId, Data>,
-        _deadline_miss: Option<DeadlineMiss>,
+        _deadline_miss: Option<LocalDeadlineMiss>,
     ) -> zenoh_flow::ZFResult<HashMap<zenoh_flow::PortId, NodeOutput>> {
         default_output_rule(state, outputs)
     }
@@ -220,8 +221,7 @@ async fn main() {
 
     let args = CallArgs::from_args();
 
-    let session =
-        async_std::sync::Arc::new(zenoh::net::open(zenoh::net::config::peer()).await.unwrap());
+    let session = Arc::new(zenoh::open(zenoh::config::Config::default()).await.unwrap());
     let hlc = async_std::sync::Arc::new(uhlc::HLC::default());
     let rt_uuid = uuid::Uuid::new_v4();
     let ctx = RuntimeContext {
@@ -242,7 +242,7 @@ async fn main() {
     let config = serde_json::json!({"payload_size" : args.size});
     let config = Some(config);
 
-    zf_graph.add_static_source(
+    zf_graph.try_add_static_source(
         "thr-source".into(),
         None,
         PortDescriptor {
@@ -251,9 +251,9 @@ async fn main() {
         },
         source.initialize(&config).unwrap(),
         source,
-    );
+    ).unwrap();
 
-    zf_graph.add_static_sink(
+    zf_graph.try_add_static_sink(
         "thr-sink".into(),
         PortDescriptor {
             port_id: String::from(PORT).into(),
@@ -261,9 +261,9 @@ async fn main() {
         },
         sink.initialize(&config).unwrap(),
         sink,
-    );
+    ).unwrap();
 
-    zf_graph.add_static_operator(
+    zf_graph.try_add_static_operator(
         "noop".into(),
         vec![PortDescriptor {
             port_id: String::from(PORT).into(),
@@ -276,15 +276,15 @@ async fn main() {
         None,
         operator.initialize(&None).unwrap(),
         operator,
-    );
+    ).unwrap();
 
     zf_graph
-        .add_link(
-            LinkFromDescriptor {
+        .try_add_link(
+            OutputDescriptor {
                 node: "thr-source".into(),
                 output: String::from(PORT).into(),
             },
-            LinkToDescriptor {
+            InputDescriptor {
                 node: "noop".into(),
                 input: String::from(PORT).into(),
             },
@@ -295,12 +295,12 @@ async fn main() {
         .unwrap();
 
     zf_graph
-        .add_link(
-            LinkFromDescriptor {
+        .try_add_link(
+            OutputDescriptor {
                 node: "noop".into(),
                 output: String::from(PORT).into(),
             },
-            LinkToDescriptor {
+            InputDescriptor {
                 node: "thr-sink".into(),
                 input: String::from(PORT).into(),
             },
@@ -310,15 +310,12 @@ async fn main() {
         )
         .unwrap();
 
-    let instance = DataflowInstance::try_instantiate(zf_graph).unwrap();
+        let mut instance = DataflowInstance::try_instantiate(zf_graph).unwrap();
 
-    let mut managers = vec![];
-
-    let runners = instance.get_runners();
-    for runner in &runners {
-        let m = runner.start();
-        managers.push(m)
-    }
+        let nodes = instance.get_nodes();
+        for id in &nodes {
+            instance.start_node(id).await.unwrap()
+        }
 
     zenoh_flow::async_std::task::sleep(std::time::Duration::from_secs(args.duration)).await;
 }

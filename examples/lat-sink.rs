@@ -37,7 +37,7 @@ impl Sink for ThrSink {
     ) -> ZFResult<()> {
         // let state = downcast!(SinkState, state).unwrap();
 
-        let data = input.data.try_get::<LatData>()?;
+        let data = input.get_inner_data().try_get::<LatData>()?;
 
         let now = get_epoch_us();
 

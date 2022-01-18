@@ -79,16 +79,16 @@ log.sort_values(by='messages', inplace=True)
 log['name'] = log['name'].astype(str)
 log['label'] = [interval_label(v) for k, v in log['messages'].iteritems()]
 # log['throughput'] = 8 * log['size'] * log['messages']
-log['layer'] = [ f"{key} - {val}" for key, val in zip(log['layer'], log['pipeline'])]
+# log['layer'] = [ f"{key} - {val}" for key, val in zip(log['layer'], log['pipeline'])]
 
 log = log.reset_index()
 
 # ALL msg/s
 fig, axes = plt.subplots()
 
-g = sns.lineplot(data=log, x='label', y='latency', estimator="median",
-             ci='sd', err_style='band', palette=palette,
-             hue='layer')
+g = sns.lineplot(data=log, x='label', y='latency', palette=palette,
+            #ci='sd', err_style='band', estimator="median",
+            hue='layer', style='pipeline')
 g.set_yscale('log')
 
 #g.set_xticklabels(log['messages'].unique())
@@ -98,17 +98,17 @@ plt.grid(which='minor', color='grey', linestyle=':', linewidth=0.1, axis='y')
 plt.xticks(rotation=72.5)
 plt.xlabel('Messages per seconds (msg/s)')
 
-plt.ylabel('Latency (micro-seconds)')
-plt.legend(title='Layer')
+plt.ylabel('Latency (seconds)')
+plt.legend(title='Layer', loc='center left', bbox_to_anchor=(1.0, 0.5))
 
-plt.yticks([pow(10, -5)] + [i*pow(10, -5)  for i in range(2, 21, 2)] + [i*pow(10, -4) for i in range(2, 21, 2)], fontsize=4)
+#plt.yticks([pow(10, -5)] + [i*pow(10, -5)  for i in range(2, 41, 2)] + [i*pow(10, -4) for i in range(2, 41, 2)], fontsize=4)
 
 ticker = mpl.ticker.EngFormatter(unit='')
 axes.yaxis.set_major_formatter(ticker)
 
 plt.tight_layout()
 #plt.show()
-fig.savefig(img_dir.joinpath('ros2-latency-all.pdf'))
+fig.savefig(img_dir.joinpath('latency-all.pdf'))
 
 # ALL throughput
 # fig, axes = plt.subplots()

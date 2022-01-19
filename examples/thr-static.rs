@@ -19,7 +19,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 use structopt::StructOpt;
 use zenoh_flow::async_std::sync::Arc;
-use zenoh_flow::model::{OutputDescriptor, InputDescriptor};
+use zenoh_flow::model::{InputDescriptor, OutputDescriptor};
 use zenoh_flow::runtime::dataflow::instance::DataflowInstance;
 use zenoh_flow::runtime::dataflow::loader::{Loader, LoaderConfig};
 use zenoh_flow::runtime::RuntimeContext;
@@ -184,10 +184,7 @@ impl Operator for NoOp {
     ) -> zenoh_flow::ZFResult<HashMap<zenoh_flow::PortId, Data>> {
         let mut results: HashMap<PortId, Data> = HashMap::new();
 
-        let data = inputs
-            .get_mut(PORT)
-            .unwrap()
-            .get_inner_data().clone();
+        let data = inputs.get_mut(PORT).unwrap().get_inner_data().clone();
 
         results.insert(PORT.into(), data);
         Ok(results)
@@ -242,41 +239,47 @@ async fn main() {
     let config = serde_json::json!({"payload_size" : args.size});
     let config = Some(config);
 
-    zf_graph.try_add_static_source(
-        "thr-source".into(),
-        None,
-        PortDescriptor {
-            port_id: String::from(PORT).into(),
-            port_type: String::from("thr").into(),
-        },
-        source.initialize(&config).unwrap(),
-        source,
-    ).unwrap();
+    zf_graph
+        .try_add_static_source(
+            "thr-source".into(),
+            None,
+            PortDescriptor {
+                port_id: String::from(PORT).into(),
+                port_type: String::from("thr").into(),
+            },
+            source.initialize(&config).unwrap(),
+            source,
+        )
+        .unwrap();
 
-    zf_graph.try_add_static_sink(
-        "thr-sink".into(),
-        PortDescriptor {
-            port_id: String::from(PORT).into(),
-            port_type: String::from("thr").into(),
-        },
-        sink.initialize(&config).unwrap(),
-        sink,
-    ).unwrap();
+    zf_graph
+        .try_add_static_sink(
+            "thr-sink".into(),
+            PortDescriptor {
+                port_id: String::from(PORT).into(),
+                port_type: String::from("thr").into(),
+            },
+            sink.initialize(&config).unwrap(),
+            sink,
+        )
+        .unwrap();
 
-    zf_graph.try_add_static_operator(
-        "noop".into(),
-        vec![PortDescriptor {
-            port_id: String::from(PORT).into(),
-            port_type: String::from("thr").into(),
-        }],
-        vec![PortDescriptor {
-            port_id: String::from(PORT).into(),
-            port_type: String::from("thr").into(),
-        }],
-        None,
-        operator.initialize(&None).unwrap(),
-        operator,
-    ).unwrap();
+    zf_graph
+        .try_add_static_operator(
+            "noop".into(),
+            vec![PortDescriptor {
+                port_id: String::from(PORT).into(),
+                port_type: String::from("thr").into(),
+            }],
+            vec![PortDescriptor {
+                port_id: String::from(PORT).into(),
+                port_type: String::from("thr").into(),
+            }],
+            None,
+            operator.initialize(&None).unwrap(),
+            operator,
+        )
+        .unwrap();
 
     zf_graph
         .try_add_link(
@@ -310,12 +313,12 @@ async fn main() {
         )
         .unwrap();
 
-        let mut instance = DataflowInstance::try_instantiate(zf_graph).unwrap();
+    let mut instance = DataflowInstance::try_instantiate(zf_graph).unwrap();
 
-        let nodes = instance.get_nodes();
-        for id in &nodes {
-            instance.start_node(id).await.unwrap()
-        }
+    let nodes = instance.get_nodes();
+    for id in &nodes {
+        instance.start_node(id).await.unwrap()
+    }
 
     zenoh_flow::async_std::task::sleep(std::time::Duration::from_secs(args.duration)).await;
 }

@@ -24,8 +24,8 @@ use zenoh_flow::runtime::RuntimeContext;
 use zenoh_flow::zenoh_flow_derive::ZFState;
 use zenoh_flow::{
     default_input_rule, default_output_rule, model::link::PortDescriptor, zf_empty_state,
-    Configuration, Context, Data, Node, NodeOutput, Operator, PortId, Sink, Source, State,
-    ZFResult, LocalDeadlineMiss,
+    Configuration, Context, Data, LocalDeadlineMiss, Node, NodeOutput, Operator, PortId, Sink,
+    Source, State, ZFResult,
 };
 use zenoh_flow_perf::{get_epoch_us, Latency};
 
@@ -127,7 +127,10 @@ impl Node for LatSink {
             None => 1u64,
         };
 
-        let msgs = (1.0 / interval) as u64;
+        let msgs = match configuration {
+            Some(conf) => conf["msgs"].as_u64().unwrap(),
+            None => 1u64,
+        };
 
         Ok(State::from(LatSinkState {
             interval,
@@ -166,14 +169,9 @@ impl Operator for NoOp {
     ) -> zenoh_flow::ZFResult<HashMap<zenoh_flow::PortId, Data>> {
         let mut results: HashMap<PortId, Data> = HashMap::new();
 
-        let data = inputs
-            .get_mut(PORT)
-            .unwrap()
-            .get_inner_data()
-            .try_get::<Latency>().unwrap();
+        let data = inputs.get_mut(PORT).unwrap().get_inner_data().clone();
 
-
-        results.insert(PORT.into(), Data::from::<Latency>(data.clone()));
+        results.insert(PORT.into(), data);
         Ok(results)
     }
 
@@ -205,7 +203,7 @@ async fn main() {
 
     let args = CallArgs::from_args();
 
-    let interval = 1.0/(args.msgs as f64);
+    let interval = 1.0 / (args.msgs as f64);
 
     let session = Arc::new(zenoh::open(zenoh::config::Config::default()).await.unwrap());
     let hlc = async_std::sync::Arc::new(uhlc::HLC::default());
@@ -233,50 +231,53 @@ async fn main() {
 
     // let operator = Arc::new(NoOp {});
 
-    let config = serde_json::json!({"interval" : interval, "pipeline":args.pipeline});
+    let config =
+        serde_json::json!({"interval" : interval, "pipeline":args.pipeline, "msgs": args.msgs});
     let config = Some(config);
 
+    zf_graph
+        .try_add_static_source(
+            "lat-source".into(),
+            None,
+            PortDescriptor {
+                port_id: String::from(PORT).into(),
+                port_type: String::from("lat").into(),
+            },
+            source.initialize(&config).unwrap(),
+            source,
+        )
+        .unwrap();
 
-
-    zf_graph.try_add_static_source(
-        "lat-source".into(),
-        None,
-        PortDescriptor {
-            port_id: String::from(PORT).into(),
-            port_type: String::from("lat").into(),
-        },
-        source.initialize(&config).unwrap(),
-        source,
-    ).unwrap();
-
-    zf_graph.try_add_static_sink(
-        "lat-sink".into(),
-        PortDescriptor {
-            port_id: String::from(PORT).into(),
-            port_type: String::from("lat").into(),
-        },
-        sink.initialize(&config).unwrap(),
-        sink,
-    ).unwrap();
+    zf_graph
+        .try_add_static_sink(
+            "lat-sink".into(),
+            PortDescriptor {
+                port_id: String::from(PORT).into(),
+                port_type: String::from("lat").into(),
+            },
+            sink.initialize(&config).unwrap(),
+            sink,
+        )
+        .unwrap();
 
     for (i, op) in operators.into_iter().enumerate() {
-
-        zf_graph.try_add_static_operator(
-            format!("noop{i}").into(),
-            vec![PortDescriptor {
-                port_id: String::from(PORT).into(),
-                port_type: String::from("lat").into(),
-            }],
-            vec![PortDescriptor {
-                port_id: String::from(PORT).into(),
-                port_type: String::from("lat").into(),
-            }],
-            None,
-            op.initialize(&None).unwrap(),
-            op,
-        ).unwrap();
+        zf_graph
+            .try_add_static_operator(
+                format!("noop{i}").into(),
+                vec![PortDescriptor {
+                    port_id: String::from(PORT).into(),
+                    port_type: String::from("lat").into(),
+                }],
+                vec![PortDescriptor {
+                    port_id: String::from(PORT).into(),
+                    port_type: String::from("lat").into(),
+                }],
+                None,
+                op.initialize(&None).unwrap(),
+                op,
+            )
+            .unwrap();
     }
-
 
     let mut pipe = String::from("");
     zf_graph
@@ -318,7 +319,7 @@ async fn main() {
         pipe.push_str(format!("noop{j}-->noop{i}-->").as_str());
     }
 
-    let len = args.pipeline-1;
+    let len = args.pipeline - 1;
     zf_graph
         .try_add_link(
             OutputDescriptor {

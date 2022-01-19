@@ -39,23 +39,13 @@ clap = "2.33"
 uuid = { version = "0.8", features = ["serde", "v4"] }
 
 [[example]]
-name = "thr-source"
+name = "dyn-sink"
 crate-type = ["cdylib"]
 
 [[example]]
-name = "thr-sink"
+name = "dyn-source"
 crate-type = ["cdylib"]
 
 [[example]]
-name = "lat-source"
+name = "dyn-noop"
 crate-type = ["cdylib"]
-
-[[example]]
-name = "lat-sink"
-crate-type = ["cdylib"]
-
-[[example]]
-name = "lat-link"
-
-[[example]]
-name = "thr-link"

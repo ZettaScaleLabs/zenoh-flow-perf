@@ -31,7 +31,7 @@ mkdir -p $OUT_DIR
 
 plog "Running Zenoh Flow Latency test - same process"
 THR_FILE="$OUT_DIR/zf-lat-$TS.csv"
-echo "layer,scenario,test,name,messages,pipeline,latency" > $THR_FILE
+echo "layer,scenario,test,name,messages,pipeline,latency,unit" > $THR_FILE
 
 length=$CHAIN_LENGTH
 while  [ $length -le $CHAIN_LENGTH_END ]
@@ -110,37 +110,6 @@ done
 TOT_SAMPLES=$(cat $THR_FILE | wc -l)
 
 plog "Done Test results stored in $OUT_DIR - Total Samples: $TOT_SAMPLES"
-
-
-plog "Running Zenoh Flow Latency test - serde"
-THR_FILE="$OUT_DIR/zf-serde-$TS.csv"
-echo "layer,scenario,test,name,messages,pipeline,latency" > $THR_FILE
-
-length=$CHAIN_LENGTH
-while  [ $length -le $CHAIN_LENGTH_END ]
-do
-   plog "[ RUN ] Zenoh Flow for chain length $length"
-   s=$INITIAL_MSGS
-   while [ $s -le $FINAL_MSGS ]
-   do
-
-      timeout $DURATION $BIN_DIR/$SERDE -m $s -p $length >> $THR_FILE
-
-      ps -A | grep $SERDE | awk {'print $1'} | xargs kill -9 > /dev/null  2>&1
-
-      plog "[ DONE ] Zenoh Flow for msgs $s, chain length $length"
-      sleep 1
-      echo "Still running $SERDE: $(ps -A | grep $SERDE | wc -l) - This should be 0"
-
-      s=$(($s * 10))
-
-   done
-   plog "[ DONE ] Zenoh Flow for chain length $length"
-   length=$(($length * 2))
-done
-TOT_SAMPLES=$(cat $THR_FILE | wc -l)
-
-plog "Done Test same process results stored in $OUT_DIR - Total Samples: $TOT_SAMPLES"
 
 plog "Bye!"
 

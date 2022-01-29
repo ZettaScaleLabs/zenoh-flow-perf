@@ -36,7 +36,7 @@ mkdir -p $OUT_DIR
 
 plog "Running ROS2 Latency test"
 THR_FILE="$OUT_DIR/ros-lat-$TS.csv"
-echo "layer,scenario,test,name,messages,pipeline,latency" > $THR_FILE
+echo "layer,scenario,test,name,messages,pipeline,latency,unit" > $THR_FILE
 
 length=$CHAIN_LENGTH
 while  [ $length -le $CHAIN_LENGTH_END ]

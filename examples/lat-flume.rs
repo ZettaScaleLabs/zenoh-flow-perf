@@ -12,24 +12,21 @@
 //   ADLINK zenoh team, <zenoh@adlink-labs.tech>
 //
 
+use std::time::Duration;
 use structopt::StructOpt;
-use zenoh_flow::async_std::sync::Arc;
 use zenoh_flow::async_std::task;
+use zenoh_flow_perf::{get_epoch_us, Latency};
 
-static DEFAULT_INT: &str = "1";
-static DEFAULT_SIZE: &str = "8";
-static DEFAULT_DURATION: &str = "60";
-use std::time::{Duration, Instant};
+static DEFAULT_PIPELINE: &str = "1";
+static DEFAULT_MSGS: &str = "1";
 
 #[derive(StructOpt, Debug)]
 struct CallArgs {
     /// Config file
-    #[structopt(short, long, default_value = DEFAULT_SIZE)]
-    size: u64,
-    #[structopt(short, long, default_value = DEFAULT_INT)]
-    interveal: f64,
-    #[structopt(short, long, default_value = DEFAULT_DURATION)]
-    duration: u64,
+    #[structopt(short, long, default_value = DEFAULT_PIPELINE)]
+    pipeline: u64,
+    #[structopt(short, long, default_value = DEFAULT_MSGS)]
+    msgs: u64,
 }
 
 #[async_std::main]
@@ -38,32 +35,25 @@ async fn main() {
 
     let args = CallArgs::from_args();
 
-    let (sender, receiver) = flume::unbounded::<(Instant, Arc<Vec<u8>>)>();
+    let (sender, receiver) = flume::unbounded::<Latency>();
 
+    let c_msgs = args.msgs.clone();
+    let pipeline_msgs = args.pipeline.clone();
     task::spawn(async move {
         while let Ok(data) = receiver.recv_async().await {
-            let elapsed = data.0.elapsed().as_nanos() as u64;
+            let now = get_epoch_us();
+            let elapsed = now - data.ts;
 
-            println!(
-                "flume,scenario-name,latency,test-name,{},y,x,{}",
-                data.1.len(),
-                elapsed
-            );
+            // layer,scenario name,test kind, test name, payload size, msg/s, pipeline size, latency, unit
+            println!("flume,scenario-name,latency,pipeline,{c_msgs},{pipeline_msgs},{elapsed},us");
         }
     });
 
-    let d = args.duration;
-    task::spawn(async move {
-        task::sleep(Duration::from_secs(d)).await;
-        std::process::exit(0);
-    });
-
-    let data = Arc::new(vec![0; args.size as usize]);
+    let interval = 1.0 / (args.msgs as f64);
 
     loop {
-        task::sleep(Duration::from_secs_f64(args.interveal)).await;
-        let now_s = Instant::now();
-        let d = (now_s, Arc::clone(&data));
-        sender.send_async(d).await.unwrap();
+        task::sleep(Duration::from_secs_f64(interval)).await;
+        let msg = Latency { ts: get_epoch_us() };
+        sender.send_async(msg).await.unwrap();
     }
 }

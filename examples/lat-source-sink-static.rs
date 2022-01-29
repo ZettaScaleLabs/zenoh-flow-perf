@@ -13,7 +13,6 @@
 //
 
 use async_trait::async_trait;
-use std::collections::HashMap;
 use std::time::Duration;
 use structopt::StructOpt;
 use zenoh_flow::async_std::sync::Arc;
@@ -23,9 +22,7 @@ use zenoh_flow::runtime::dataflow::loader::{Loader, LoaderConfig};
 use zenoh_flow::runtime::RuntimeContext;
 use zenoh_flow::zenoh_flow_derive::ZFState;
 use zenoh_flow::{
-    default_input_rule, default_output_rule, model::link::PortDescriptor, zf_empty_state,
-    Configuration, Context, Data, LocalDeadlineMiss, Node, NodeOutput, Operator, PortId, Sink,
-    Source, State, ZFResult,
+    model::link::PortDescriptor, Configuration, Context, Data, Node, Sink, Source, State, ZFResult,
 };
 use zenoh_flow_perf::{get_epoch_us, Latency};
 
@@ -109,7 +106,7 @@ impl Sink for LatSink {
         let msgs = real_state.msgs;
         let pipeline = real_state.pipeline;
         // layer,scenario name,test kind, test name, payload size, msg/s, pipeline size, latency, unit
-        println!("zenoh-flow,scenario,latency,pipeline,{msgs},{pipeline},{elapsed},us");
+        println!("zf-source-sink,scenario,latency,pipeline,{msgs},{pipeline},{elapsed},us");
 
         Ok(())
     }
@@ -146,56 +143,6 @@ impl Node for LatSink {
     }
 }
 
-// OPERATOR
-
-#[derive(Debug)]
-struct NoOp;
-
-impl Operator for NoOp {
-    fn input_rule(
-        &self,
-        _context: &mut zenoh_flow::Context,
-        state: &mut State,
-        tokens: &mut HashMap<PortId, zenoh_flow::InputToken>,
-    ) -> zenoh_flow::ZFResult<bool> {
-        default_input_rule(state, tokens)
-    }
-
-    fn run(
-        &self,
-        _context: &mut zenoh_flow::Context,
-        _state: &mut State,
-        inputs: &mut HashMap<PortId, zenoh_flow::runtime::message::DataMessage>,
-    ) -> zenoh_flow::ZFResult<HashMap<zenoh_flow::PortId, Data>> {
-        let mut results: HashMap<PortId, Data> = HashMap::new();
-
-        let data = inputs.get_mut(PORT).unwrap().get_inner_data().clone();
-
-        results.insert(PORT.into(), data);
-        Ok(results)
-    }
-
-    fn output_rule(
-        &self,
-        _context: &mut zenoh_flow::Context,
-        state: &mut State,
-        outputs: HashMap<PortId, Data>,
-        _deadline_miss: Option<LocalDeadlineMiss>,
-    ) -> zenoh_flow::ZFResult<HashMap<zenoh_flow::PortId, NodeOutput>> {
-        default_output_rule(state, outputs)
-    }
-}
-
-impl Node for NoOp {
-    fn initialize(&self, _configuration: &Option<Configuration>) -> ZFResult<State> {
-        zf_empty_state!()
-    }
-
-    fn finalize(&self, _state: &mut State) -> ZFResult<()> {
-        Ok(())
-    }
-}
-
 // Run dataflow in single runtime
 #[async_std::main]
 async fn main() {
@@ -222,12 +169,6 @@ async fn main() {
 
     let source = Arc::new(LatSource {});
     let sink = Arc::new(LatSink {});
-
-    let mut operators = vec![];
-
-    for _ in 0..args.pipeline {
-        operators.push(Arc::new(NoOp {}));
-    }
 
     // let operator = Arc::new(NoOp {});
 
@@ -260,25 +201,6 @@ async fn main() {
         )
         .unwrap();
 
-    for (i, op) in operators.into_iter().enumerate() {
-        zf_graph
-            .try_add_static_operator(
-                format!("noop{i}").into(),
-                vec![PortDescriptor {
-                    port_id: String::from(PORT).into(),
-                    port_type: String::from("lat").into(),
-                }],
-                vec![PortDescriptor {
-                    port_id: String::from(PORT).into(),
-                    port_type: String::from("lat").into(),
-                }],
-                None,
-                op.initialize(&None).unwrap(),
-                op,
-            )
-            .unwrap();
-    }
-
     let mut pipe = String::from("");
     zf_graph
         .try_add_link(
@@ -287,7 +209,7 @@ async fn main() {
                 output: String::from(PORT).into(),
             },
             InputDescriptor {
-                node: format!("noop0").into(),
+                node: format!("lat-sink").into(),
                 input: String::from(PORT).into(),
             },
             None,
@@ -295,47 +217,7 @@ async fn main() {
             None,
         )
         .unwrap();
-    pipe.push_str(format!("lat-source-->noop0-->").as_str());
-
-    for i in 1..args.pipeline {
-        // println!("Iteration {i}");
-
-        let j = i - 1;
-        zf_graph
-            .try_add_link(
-                OutputDescriptor {
-                    node: format!("noop{j}").into(),
-                    output: String::from(PORT).into(),
-                },
-                InputDescriptor {
-                    node: format!("noop{i}").into(),
-                    input: String::from(PORT).into(),
-                },
-                None,
-                None,
-                None,
-            )
-            .unwrap();
-        pipe.push_str(format!("noop{j}-->noop{i}-->").as_str());
-    }
-
-    let len = args.pipeline - 1;
-    zf_graph
-        .try_add_link(
-            OutputDescriptor {
-                node: format!("noop{len}").into(),
-                output: String::from(PORT).into(),
-            },
-            InputDescriptor {
-                node: "lat-sink".into(),
-                input: String::from(PORT).into(),
-            },
-            None,
-            None,
-            None,
-        )
-        .unwrap();
-    pipe.push_str(format!("noop{len}-->lat-sink").as_str());
+    pipe.push_str(format!("lat-source-->lat-sink").as_str());
 
     // println!("Pipeline is: {pipe}");
 

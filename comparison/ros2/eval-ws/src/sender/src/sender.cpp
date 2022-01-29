@@ -6,10 +6,10 @@
 
 using ato::sender::Sender;
 
-Sender::Sender(const uint64_t msgs) : rclcpp::Node("sender_node", rclcpp::NodeOptions().use_intra_process_comms(true)) {
-
+Sender::Sender(const uint64_t msgs) : rclcpp::Node("sender_node", rclcpp::NodeOptions().use_intra_process_comms(false)) {
+    auto qos = rclcpp::QoS(rclcpp::KeepAll()).reliable();
     auto pace = std::chrono::duration<double>(1.0/double(msgs));
-    this->publisher = this->create_publisher<eval_interfaces::msg::Evaluation>("out_0", 1);
+    this->publisher = this->create_publisher<eval_interfaces::msg::Evaluation>("out_0", qos);
     this->timer = this->create_wall_timer(pace, std::bind(&Sender::publish_message, this));
 
     RCLCPP_INFO(this->get_logger(), "Init Sender msg/s %d pace is %f", msgs, pace);

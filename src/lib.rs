@@ -90,3 +90,25 @@ impl Deserializable for Latency {
         bincode::deserialize::<Latency>(bytes).map_err(|_| ZFError::DeseralizationError)
     }
 }
+
+#[derive(Debug, Clone, ZFData, Serialize, Deserialize)]
+pub struct CriterionData {
+    pub d: u64,
+}
+
+impl ZFData for CriterionData {
+    fn try_serialize(&self) -> zenoh_flow::ZFResult<Vec<u8>> {
+        Ok(bincode::serialize(self)
+            .map_err(|_| ZFError::SerializationError)?
+            .to_vec())
+    }
+}
+
+impl Deserializable for CriterionData {
+    fn try_deserialize(bytes: &[u8]) -> ZFResult<CriterionData>
+    where
+        Self: Sized,
+    {
+        bincode::deserialize::<CriterionData>(bytes).map_err(|_| ZFError::DeseralizationError)
+    }
+}

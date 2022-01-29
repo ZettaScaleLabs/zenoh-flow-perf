@@ -6,11 +6,14 @@
 
 using ato::compute::Compute;
 
-Compute::Compute(const std::string listen_topic, const std::string publish_topic) : rclcpp::Node("compute_node", rclcpp::NodeOptions().use_intra_process_comms(true)) {
+Compute::Compute(const std::string listen_topic, const std::string publish_topic) : rclcpp::Node("compute_node", rclcpp::NodeOptions().use_intra_process_comms(false)) {
+
+    auto qos_pub = rclcpp::QoS(rclcpp::KeepAll()).reliable();
+    auto qos_sub = rclcpp::QoS(rclcpp::KeepAll()).reliable();
 
 
-    this->publisher = this->create_publisher<eval_interfaces::msg::Evaluation>(publish_topic, 1);
-    this->subscriber = this->create_subscription<eval_interfaces::msg::Evaluation>(listen_topic, 1, std::bind(&Compute::receiver_callback, this, std::placeholders::_1));
+    this->publisher = this->create_publisher<eval_interfaces::msg::Evaluation>(publish_topic, qos_pub);
+    this->subscriber = this->create_subscription<eval_interfaces::msg::Evaluation>(listen_topic, qos_sub, std::bind(&Compute::receiver_callback, this, std::placeholders::_1));
 
     RCLCPP_INFO(this->get_logger(), "Init Compute with listener %s and publisher %s", listen_topic.c_str(), publish_topic.c_str());
 

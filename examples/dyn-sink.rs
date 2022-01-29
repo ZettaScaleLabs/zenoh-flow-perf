@@ -48,8 +48,9 @@ impl Sink for LatSink {
         let elapsed = now - data.ts;
         let msgs = real_state.msgs;
         let pipeline = real_state.pipeline;
-        // layer,scenario name,test kind, test name, payload size, msg/s, pipeline size, latency,
-        println!("zenoh-flow-multi,scenario,latency,pipeline,{msgs},{pipeline},{elapsed}");
+
+        // layer,scenario name,test kind, test name, payload size, msg/s, pipeline size, latency, unit
+        println!("zenoh-flow-multi,scenario,latency,pipeline,{msgs},{pipeline},{elapsed},us");
 
         Ok(())
     }

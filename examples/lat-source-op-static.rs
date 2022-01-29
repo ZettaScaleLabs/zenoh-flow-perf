@@ -23,9 +23,8 @@ use zenoh_flow::runtime::dataflow::loader::{Loader, LoaderConfig};
 use zenoh_flow::runtime::RuntimeContext;
 use zenoh_flow::zenoh_flow_derive::ZFState;
 use zenoh_flow::{
-    default_input_rule, default_output_rule, model::link::PortDescriptor, zf_empty_state,
-    Configuration, Context, Data, LocalDeadlineMiss, Node, NodeOutput, Operator, PortId, Sink,
-    Source, State, ZFResult,
+    default_input_rule, default_output_rule, model::link::PortDescriptor, Configuration, Context,
+    Data, LocalDeadlineMiss, Node, NodeOutput, Operator, PortId, Source, State, ZFResult,
 };
 use zenoh_flow_perf::{get_epoch_us, Latency};
 
@@ -79,74 +78,14 @@ impl Node for LatSource {
     }
 }
 
-// SINK
-
-struct LatSink;
+// OPERATOR
 
 #[derive(ZFState, Debug, Clone)]
-struct LatSinkState {
+struct LatOpState {
     pipeline: u64,
     interval: f64,
     msgs: u64,
 }
-
-#[async_trait]
-impl Sink for LatSink {
-    async fn run(
-        &self,
-        _context: &mut Context,
-        state: &mut State,
-        mut input: zenoh_flow::runtime::message::DataMessage,
-    ) -> zenoh_flow::ZFResult<()> {
-        let real_state = state.try_get::<LatSinkState>()?;
-        let _ = real_state.interval;
-
-        let data = input.get_inner_data().try_get::<Latency>()?;
-
-        let now = get_epoch_us();
-
-        let elapsed = now - data.ts;
-        let msgs = real_state.msgs;
-        let pipeline = real_state.pipeline;
-        // layer,scenario name,test kind, test name, payload size, msg/s, pipeline size, latency, unit
-        println!("zenoh-flow,scenario,latency,pipeline,{msgs},{pipeline},{elapsed},us");
-
-        Ok(())
-    }
-}
-
-impl Node for LatSink {
-    fn initialize(&self, configuration: &Option<Configuration>) -> ZFResult<State> {
-        let interval = match configuration {
-            Some(conf) => conf["interval"].as_f64().unwrap(),
-            None => 1.0f64,
-        };
-
-        let pipeline = match configuration {
-            Some(conf) => conf["pipeline"].as_u64().unwrap(),
-            None => 1u64,
-        };
-
-        let msgs = match configuration {
-            Some(conf) => conf["msgs"].as_u64().unwrap(),
-            None => 1u64,
-        };
-
-        Ok(State::from(LatSinkState {
-            interval,
-            pipeline,
-            msgs,
-        }))
-    }
-
-    fn finalize(&self, state: &mut State) -> ZFResult<()> {
-        let _real_state = state.try_get::<LatSinkState>()?;
-
-        Ok(())
-    }
-}
-
-// OPERATOR
 
 #[derive(Debug)]
 struct NoOp;
@@ -164,14 +103,28 @@ impl Operator for NoOp {
     fn run(
         &self,
         _context: &mut zenoh_flow::Context,
-        _state: &mut State,
+        state: &mut State,
         inputs: &mut HashMap<PortId, zenoh_flow::runtime::message::DataMessage>,
     ) -> zenoh_flow::ZFResult<HashMap<zenoh_flow::PortId, Data>> {
-        let mut results: HashMap<PortId, Data> = HashMap::new();
+        let results: HashMap<PortId, Data> = HashMap::new();
 
-        let data = inputs.get_mut(PORT).unwrap().get_inner_data().clone();
+        let real_state = state.try_get::<LatOpState>()?;
+        let _ = real_state.interval;
 
-        results.insert(PORT.into(), data);
+        let data = inputs
+            .get_mut(PORT)
+            .unwrap()
+            .get_inner_data()
+            .try_get::<Latency>()?;
+
+        let now = get_epoch_us();
+
+        let elapsed = now - data.ts;
+        let msgs = real_state.msgs;
+        let pipeline = real_state.pipeline;
+        // layer,scenario name,test kind, test name, payload size, msg/s, pipeline size, latency, unit
+        println!("zf-source-op,scenario,latency,pipeline,{msgs},{pipeline},{elapsed},us");
+
         Ok(results)
     }
 
@@ -187,8 +140,27 @@ impl Operator for NoOp {
 }
 
 impl Node for NoOp {
-    fn initialize(&self, _configuration: &Option<Configuration>) -> ZFResult<State> {
-        zf_empty_state!()
+    fn initialize(&self, configuration: &Option<Configuration>) -> ZFResult<State> {
+        let interval = match configuration {
+            Some(conf) => conf["interval"].as_f64().unwrap(),
+            None => 1.0f64,
+        };
+
+        let pipeline = match configuration {
+            Some(conf) => conf["pipeline"].as_u64().unwrap(),
+            None => 1u64,
+        };
+
+        let msgs = match configuration {
+            Some(conf) => conf["msgs"].as_u64().unwrap(),
+            None => 1u64,
+        };
+
+        Ok(State::from(LatOpState {
+            interval,
+            pipeline,
+            msgs,
+        }))
     }
 
     fn finalize(&self, _state: &mut State) -> ZFResult<()> {
@@ -221,15 +193,7 @@ async fn main() {
         zenoh_flow::runtime::dataflow::Dataflow::new(ctx.clone(), "lat-static".into(), None);
 
     let source = Arc::new(LatSource {});
-    let sink = Arc::new(LatSink {});
-
-    let mut operators = vec![];
-
-    for _ in 0..args.pipeline {
-        operators.push(Arc::new(NoOp {}));
-    }
-
-    // let operator = Arc::new(NoOp {});
+    let op = Arc::new(NoOp {});
 
     let config =
         serde_json::json!({"interval" : interval, "pipeline":args.pipeline, "msgs": args.msgs});
@@ -249,35 +213,18 @@ async fn main() {
         .unwrap();
 
     zf_graph
-        .try_add_static_sink(
-            "lat-sink".into(),
-            PortDescriptor {
+        .try_add_static_operator(
+            format!("noop").into(),
+            vec![PortDescriptor {
                 port_id: String::from(PORT).into(),
                 port_type: String::from("lat").into(),
-            },
-            sink.initialize(&config).unwrap(),
-            sink,
+            }],
+            vec![],
+            None,
+            op.initialize(&config).unwrap(),
+            op,
         )
         .unwrap();
-
-    for (i, op) in operators.into_iter().enumerate() {
-        zf_graph
-            .try_add_static_operator(
-                format!("noop{i}").into(),
-                vec![PortDescriptor {
-                    port_id: String::from(PORT).into(),
-                    port_type: String::from("lat").into(),
-                }],
-                vec![PortDescriptor {
-                    port_id: String::from(PORT).into(),
-                    port_type: String::from("lat").into(),
-                }],
-                None,
-                op.initialize(&None).unwrap(),
-                op,
-            )
-            .unwrap();
-    }
 
     let mut pipe = String::from("");
     zf_graph
@@ -287,7 +234,7 @@ async fn main() {
                 output: String::from(PORT).into(),
             },
             InputDescriptor {
-                node: format!("noop0").into(),
+                node: format!("noop").into(),
                 input: String::from(PORT).into(),
             },
             None,
@@ -295,47 +242,7 @@ async fn main() {
             None,
         )
         .unwrap();
-    pipe.push_str(format!("lat-source-->noop0-->").as_str());
-
-    for i in 1..args.pipeline {
-        // println!("Iteration {i}");
-
-        let j = i - 1;
-        zf_graph
-            .try_add_link(
-                OutputDescriptor {
-                    node: format!("noop{j}").into(),
-                    output: String::from(PORT).into(),
-                },
-                InputDescriptor {
-                    node: format!("noop{i}").into(),
-                    input: String::from(PORT).into(),
-                },
-                None,
-                None,
-                None,
-            )
-            .unwrap();
-        pipe.push_str(format!("noop{j}-->noop{i}-->").as_str());
-    }
-
-    let len = args.pipeline - 1;
-    zf_graph
-        .try_add_link(
-            OutputDescriptor {
-                node: format!("noop{len}").into(),
-                output: String::from(PORT).into(),
-            },
-            InputDescriptor {
-                node: "lat-sink".into(),
-                input: String::from(PORT).into(),
-            },
-            None,
-            None,
-            None,
-        )
-        .unwrap();
-    pipe.push_str(format!("noop{len}-->lat-sink").as_str());
+    pipe.push_str(format!("lat-source-->noop").as_str());
 
     // println!("Pipeline is: {pipe}");
 

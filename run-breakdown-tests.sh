@@ -6,7 +6,7 @@ TS=`eval date "+%F-%T"`
    echo "[$TS]: $1"
 }
 
-usage() { printf "Usage: $0 \n\t-f flume\n\t-l link\n\t-s static\n\t-d dynamic\n\t-z zenoh\n\t-c CycloneDDS\n\t-r ROS2" 1>&2; exit 1; }
+usage() { printf "Usage: $0 \n\t-f flume\n\t-l link\n\t-s static\n\t-d dynamic\n\t-z zenoh\n\t-c CycloneDDS\n\t-r ROS2\n" 1>&2; exit 1; }
 
 
 
@@ -128,7 +128,7 @@ while getopts "hflsdzcr" arg; do
          plog "[ DONE ] Zenoh Flow Source->Operator->Sink Static for msg/s $s  w/ Ping"
          sleep 1
          echo "Still running $LAT_STATIC: $(ps -ax | grep $LAT_STATIC | wc -l) - This should be 0"
-         rm $descriptor_file
+
          s=$(($s * 10))
 
       done

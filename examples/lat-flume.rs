@@ -35,17 +35,20 @@ async fn main() {
 
     let args = CallArgs::from_args();
 
-    let (sender, receiver) = flume::unbounded::<Latency>();
+    let (sender_ping, receiver_ping) = flume::unbounded::<Latency>();
+    let (sender_pong, receiver_pong) = flume::unbounded::<()>();
 
     let c_msgs = args.msgs.clone();
     let pipeline_msgs = args.pipeline.clone();
     task::spawn(async move {
-        while let Ok(data) = receiver.recv_async().await {
+        while let Ok(data) = receiver_ping.recv_async().await {
             let now = get_epoch_us();
             let elapsed = now - data.ts;
 
             // layer,scenario name,test kind, test name, payload size, msg/s, pipeline size, latency, unit
             println!("flume,scenario-name,latency,pipeline,{c_msgs},{pipeline_msgs},{elapsed},us");
+            sender_pong.send_async(()).await.unwrap();
+
         }
     });
 
@@ -54,6 +57,7 @@ async fn main() {
     loop {
         task::sleep(Duration::from_secs_f64(interval)).await;
         let msg = Latency { ts: get_epoch_us() };
-        sender.send_async(msg).await.unwrap();
+        sender_ping.send_async(msg).await.unwrap();
+        let _ = receiver_pong.recv_async().await.unwrap();
     }
 }

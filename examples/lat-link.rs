@@ -39,12 +39,13 @@ async fn main() {
 
     let send_id = String::from("0");
     let recv_id = String::from("10");
-    let (sender, receiver) = link::<Latency>(None, send_id.into(), recv_id.into());
+    let (sender_ping, receiver_ping) = link::<Latency>(None, send_id.clone().into(), recv_id.clone().into());
+    let (sender_pong, receiver_pong) = link::<()>(None, recv_id.into(), send_id.into());
 
     let c_msgs = args.msgs.clone();
     let pipeline_msgs = args.pipeline.clone();
     task::spawn(async move {
-        while let Ok((_, data)) = receiver.recv().await {
+        while let Ok((_, data)) = receiver_ping.recv().await {
             let now = get_epoch_us();
             let elapsed = now - data.ts;
 
@@ -52,6 +53,9 @@ async fn main() {
             println!(
                 "zf-link,scenario-name,latency,pipeline,{c_msgs},{pipeline_msgs},{elapsed},us"
             );
+
+            sender_pong.send(Arc::new(())).await.unwrap();
+
         }
     });
 
@@ -60,6 +64,7 @@ async fn main() {
     loop {
         task::sleep(Duration::from_secs_f64(interval)).await;
         let msg = Arc::new(Latency { ts: get_epoch_us() });
-        sender.send(msg).await.unwrap();
+        sender_ping.send(msg).await.unwrap();
+        let _ = receiver_pong.recv().await.unwrap();
     }
 }

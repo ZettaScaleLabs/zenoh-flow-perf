@@ -87,7 +87,7 @@ def filter(log, process, msgs=None, pipeline=None):
 
     # filtering if multi process or same process
     if process == 'multi':
-        log = log[log['layer'].isin(['zenoh-lat','zf-source-sink-multi','zenoh-flow-multi','zf-source-op-multi','zenoh-lat-udp','ros2','zenoh-lat-p','zenoh-lat-p-udp'])]
+        log = log[log['layer'].isin(['zenoh-lat','zf-source-sink-multi','zenoh-flow-multi','zf-source-op-multi','zenoh-lat-udp','ros2','zenoh-lat-p','zenoh-lat-p-udp','cyclonedds'])]
     elif process == 'single':
         log = log[log['layer'].isin(['flume','zf-link','zenoh-flow','zf-source-op','zenoh-source-sink'])]
 
@@ -177,8 +177,8 @@ def latency_stat_plot(log, scale, outfile):
     plt.ylabel('Latency (seconds)')
     plt.legend(title='Layer', loc='center left', bbox_to_anchor=(1.0, 0.5))
 
-    #ticker = mpl.ticker.EngFormatter(unit='')
-    #axes.yaxis.set_major_formatter(ticker)
+    ticker = mpl.ticker.EngFormatter(unit='')
+    axes.yaxis.set_major_formatter(ticker)
 
     plt.tight_layout()
     fig.savefig(IMG_DIR.joinpath(outfile))

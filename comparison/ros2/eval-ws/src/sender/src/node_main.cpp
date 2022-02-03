@@ -15,6 +15,13 @@
 #include <rclcpp/rclcpp.hpp>
 #include <argparse/argparse.hpp>
 #include "sender/sender.hpp"
+#include <chrono>
+#include <thread>
+
+void send_single(std::shared_ptr<ato::sender::Sender> sender) {
+    std::this_thread::sleep_for(std::chrono::duration<int>(5));
+    sender->publish_message();
+}
 
 int main (int argc, char* argv[]) {
 
@@ -43,13 +50,11 @@ int main (int argc, char* argv[]) {
     auto sender = std::make_shared<ato::sender::Sender>(msgs);
     executor.add_node(sender);
 
-    sender->publish_message();
+    std::thread t1(send_single, sender);
 
     executor.spin();
 
     rclcpp::shutdown();
 
     return 0;
-
-
 }

@@ -1,3 +1,16 @@
+//
+// Copyright (c) 2017, 2021 ADLINK Technology Inc.
+//
+// This program and the accompanying materials are made available under the
+// terms of the Eclipse Public License 2.0 which is available at
+// http://www.eclipse.org/legal/epl-2.0, or the Apache License, Version 2.0
+// which is available at https://www.apache.org/licenses/LICENSE-2.0.
+//
+// SPDX-License-Identifier: EPL-2.0 OR Apache-2.0
+//
+// Contributors:
+//   ADLINK zenoh team, <zenoh@adlink-labs.tech>
+//
 
 #include <chrono>
 #include <vector>
@@ -14,6 +27,7 @@ Receiver::Receiver(const uint64_t msgs, const std::string topic_name, const uint
     this->msgs = msgs;
     this->pipeline_length = pipeline_length;
     this->subscriber = this->create_subscription<eval_interfaces::msg::Evaluation>(topic_name, qos, std::bind(&Receiver::receiver_callback, this, std::placeholders::_1));
+    this->publisher = this->create_publisher<eval_interfaces::msg::Evaluation>("pong", qos);
 
     // RCLCPP_INFO(this->get_logger(), "Init Receiver with msg/s %d, pipeline lenght is %d, topic name is %s", this->msgs,  this->pipeline_length, topic_name.c_str());
 
@@ -29,5 +43,11 @@ void Receiver::receiver_callback(const eval_interfaces::msg::Evaluation::SharedP
 
     // layer,scenario name,test kind, test name, payload size, msg/s, pipeline size, latency, unit
     std::cout << "ros2,scenario,latency,pipeline," << this->msgs << "," << this->pipeline_length << "," << latency << ",us" << std::endl << std::flush;
+
+    auto message = eval_interfaces::msg::Evaluation();
+    message.emitter_ts = 0;
+
+    //RCLCPP_INFO(this->get_logger(), "Publish!, %ul", message.emitter_ts);
+    this->publisher->publish(message);
 
 }

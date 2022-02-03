@@ -16,9 +16,11 @@ use async_std::stream::StreamExt;
 use rand::Rng;
 use std::time::Duration;
 use structopt::StructOpt;
+use zenoh::prelude::*;
 use zenoh::publication::CongestionControl;
 use zenoh_flow::{Data, Message};
 use zenoh_flow_perf::{get_epoch_us, Latency};
+use std::io::{self, Write};
 
 static DEFAULT_PIPELINE: &str = "1";
 static DEFAULT_MSGS: &str = "1";
@@ -31,15 +33,16 @@ struct CallArgs {
     #[structopt(short, long, default_value = DEFAULT_MSGS)]
     msgs: u64,
     #[structopt(short, long)]
-    publisher: bool,
+    ping: bool,
     #[structopt(short, long)]
     udp: bool,
-    #[structopt(short, long)]
-    drop: bool,
 }
 
-async fn publisher(interval: f64, session: zenoh::Session, drop: bool) {
-    let reskey = String::from("/test/latency");
+async fn ping(interval: f64, session: zenoh::Session) {
+    let key_expr_ping = session.declare_expr("/test/latency/ping").await.unwrap();
+    let key_expr_pong = session.declare_expr("/test/latency/pong").await.unwrap();
+
+    let sub = session.subscribe(&key_expr_pong).await.unwrap();
 
     loop {
         async_std::task::sleep(Duration::from_secs_f64(interval)).await;
@@ -50,28 +53,25 @@ async fn publisher(interval: f64, session: zenoh::Session, drop: bool) {
         let msg = Message::from_serdedata(data, hlc.new_timestamp(), vec![], vec![]);
 
         let value = msg.serialize_bincode().unwrap();
-        if drop {
-            session
-                .put(&reskey, value)
-                .congestion_control(CongestionControl::Drop)
-                .await
-                .unwrap();
-        } else {
-            session
-                .put(&reskey, value)
-                .congestion_control(CongestionControl::Block)
-                .await
-                .unwrap();
-        }
+
+        session
+            .put(&key_expr_ping, value)
+            .congestion_control(CongestionControl::Block)
+            .await
+            .unwrap();
+
+        let _ = sub.recv();
     }
 }
 
-async fn subscriber(session: zenoh::Session, msgs: u64, pipeline: u64, udp: bool) {
-    let reskey = String::from("/test/latency");
-    let mut sub = session.subscribe(&reskey).await.unwrap();
+async fn pong(session: zenoh::Session, msgs: u64, pipeline: u64, udp: bool) {
+    let key_expr_ping = session.declare_expr("/test/latency/ping").await.unwrap();
+    let key_expr_pong = session.declare_expr("/test/latency/pong").await.unwrap();
+    let pong_data: Vec<u8> = vec![];
+    let mut sub = session.subscribe(&key_expr_ping).await.unwrap();
     let layer = match udp {
-        true => "zenoh-lat-udp",
-        false => "zenoh-lat",
+        true => "zenoh-lat-p-udp",
+        false => "zenoh-lat-p",
     };
 
     while let Some(msg) = sub.receiver().next().await {
@@ -85,6 +85,13 @@ async fn subscriber(session: zenoh::Session, msgs: u64, pipeline: u64, udp: bool
 
                 // layer,scenario name,test kind, test name, payload size, msg/s, pipeline size, latency, unit
                 println!("{layer},scenario,latency,pipeline,{msgs},{pipeline},{elapsed},us");
+                io::stdout().flush().unwrap();
+
+                session
+                    .put(&key_expr_pong, pong_data.clone())
+                    .congestion_control(CongestionControl::Block)
+                    .await
+                    .unwrap();
             }
             _ => (),
         }
@@ -110,13 +117,18 @@ async fn main() {
         config
             .set_listeners(vec![locator.parse().unwrap()])
             .unwrap();
+    } else {
+        let locator = format!("tcp/127.0.0.1:{}", rng.gen_range(8000..65000));
+        config
+            .set_listeners(vec![locator.parse().unwrap()])
+            .unwrap();
     }
 
     let session = zenoh::open(config).await.unwrap();
 
-    if args.publisher {
-        publisher(interval, session, args.drop).await;
+    if args.ping {
+        ping(interval, session).await;
     } else {
-        subscriber(session, args.msgs, args.length, args.udp).await;
+        pong(session, args.msgs, args.length, args.udp).await;
     }
 }

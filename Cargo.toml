@@ -15,7 +15,9 @@ readme = "README.md"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-zenoh-flow = { git = "https://github.com/eclipse-zenoh/zenoh-flow.git", branch = "master" }
+#zenoh-flow = { git = "https://github.com/eclipse-zenoh/zenoh-flow.git", branch = "master" }
+
+zenoh-flow = { path = "../zenoh-flow/zenoh-flow"}
 env_logger = "0.9"
 serde = { version = "1.0.55", features = ["derive"] }
 async-std = { version = "=1.9.0", features = ["attributes"] }
@@ -53,6 +55,14 @@ crate-type = ["cdylib"]
 
 [[example]]
 name = "dyn-noop-print"
+crate-type = ["cdylib"]
+
+[[example]]
+name = "dyn-ping"
+crate-type = ["cdylib"]
+
+[[example]]
+name = "dyn-pong"
 crate-type = ["cdylib"]
 
 

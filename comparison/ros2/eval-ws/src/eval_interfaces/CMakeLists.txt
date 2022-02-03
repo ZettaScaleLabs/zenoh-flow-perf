@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 3.5)
 project(eval_interfaces)
 
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Release)
+endif()
+
 # Default to C++17
 if(NOT CMAKE_CXX_STANDARD)
   set(CMAKE_CXX_STANDARD 17)

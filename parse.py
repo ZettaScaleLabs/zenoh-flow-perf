@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 from io import StringIO
 import matplotlib.pyplot as plt
 import matplotlib as mpl
@@ -85,7 +87,7 @@ def filter(log, process, msgs=None, pipeline=None):
 
     # filtering if multi process or same process
     if process == 'multi':
-        log = log[log['layer'].isin(['zenoh-lat','zf-source-sink-multi','zenoh-flow-multi','zf-source-op-multi','zenoh-lat-udp','ros2'])]
+        log = log[log['layer'].isin(['zenoh-lat','zf-source-sink-multi','zenoh-flow-multi','zf-source-op-multi','zenoh-lat-udp','ros2','zenoh-lat-p','zenoh-lat-p-udp'])]
     elif process == 'single':
         log = log[log['layer'].isin(['flume','zf-link','zenoh-flow','zf-source-op','zenoh-source-sink'])]
 
@@ -98,6 +100,61 @@ def filter(log, process, msgs=None, pipeline=None):
 
     return log
 
+def resample(log, downsampled_interval=1):
+    sequence_interval = 1
+    step_size = np.round(downsampled_interval / sequence_interval).astype("int")
+    log = log.iloc[::step_size, :]
+    log = log.reset_index()
+    return log
+
+def latency_ecfd_plot(log, scale, outfile):
+
+    fig, axes = plt.subplots()
+
+    g = sns.ecdfplot(data=log, x='latency', palette=palette, hue='layer', label='layer')
+
+
+    plt.grid(which='major', color='grey', linestyle='-', linewidth=0.1)
+    plt.grid(which='minor', color='grey', linestyle=':', linewidth=0.1, axis='y')
+
+    if scale == 'log':
+        g.set_xscale('log')
+
+    plt.xticks(rotation=72.5)
+    plt.xlabel('Latency (seconds)')
+
+    # plt.legend(title='layer', loc='center left', bbox_to_anchor=(1.0, 0.5))
+
+    # ticker = mpl.ticker.EngFormatter(unit='')
+    # axes.yaxis.set_major_formatter(ticker)
+
+    plt.tight_layout()
+    fig.savefig(IMG_DIR.joinpath(outfile))
+
+
+def latency_pdf_plot(log, scale, outfile):
+
+    fig, axes = plt.subplots()
+
+    g = sns.displot(data=log, x='latency', palette=palette, hue='layer', label='layer')
+
+
+    plt.grid(which='major', color='grey', linestyle='-', linewidth=0.1)
+    plt.grid(which='minor', color='grey', linestyle=':', linewidth=0.1, axis='y')
+
+    # if scale == 'log':
+    #     g.set_xscale('log')
+
+    plt.xticks(rotation=72.5)
+    plt.xlabel('Latency (seconds)')
+
+    # plt.legend(title='layer', loc='center left', bbox_to_anchor=(1.0, 0.5))
+
+    # ticker = mpl.ticker.EngFormatter(unit='')
+    # axes.yaxis.set_major_formatter(ticker)
+
+    plt.tight_layout()
+    fig.savefig(IMG_DIR.joinpath(outfile))
 
 
 def latency_stat_plot(log, scale, outfile):
@@ -105,8 +162,8 @@ def latency_stat_plot(log, scale, outfile):
     fig, axes = plt.subplots()
 
     g = sns.lineplot(data=log, x='label', y='latency', palette=palette,
-                #ci='sd', err_style='band', estimator="median",
-                hue='layer')#, style='pipeline')
+                ci=95, err_style='band', hue='layer',
+                estimator=np.median, style='pipeline')
 
     if scale == 'log':
         g.set_yscale('log')
@@ -120,8 +177,8 @@ def latency_stat_plot(log, scale, outfile):
     plt.ylabel('Latency (seconds)')
     plt.legend(title='Layer', loc='center left', bbox_to_anchor=(1.0, 0.5))
 
-    ticker = mpl.ticker.EngFormatter(unit='')
-    axes.yaxis.set_major_formatter(ticker)
+    #ticker = mpl.ticker.EngFormatter(unit='')
+    #axes.yaxis.set_major_formatter(ticker)
 
     plt.tight_layout()
     fig.savefig(IMG_DIR.joinpath(outfile))
@@ -174,11 +231,12 @@ def main():
     parser.add_argument('-k','--kind', help='Kind of the tests', required=False, choices=['latency', 'throughput'], default='latency')
     parser.add_argument('-d','--data', help='Logs directory', required=True, type=str)
     parser.add_argument('-p','--process', help='Single process or multi process', choices=['single', 'multi', 'all'], default='single', required=False)
-    parser.add_argument('-t','--type', help='Plot type', choices=['stat', 'time'], default='stat', required=False)
+    parser.add_argument('-t','--type', help='Plot type', choices=['stat', 'time', 'ecdf', 'pdf'], default='stat', required=False)
     parser.add_argument('-s','--scale', help='Plot scale', choices=['log', 'lin'], default='log', required=False)
     parser.add_argument('-m','--msgs', help='Filter for this # of msg/s', required=False, type=int)
     parser.add_argument('-l','--length', help='Filter for this pipeline length', required=False, type=int)
     parser.add_argument('-o','--output', help='Output file name', required=False, type=str, default='plot.pdf')
+    parser.add_argument('-r','--resample', help='Resample the data', required=False, type=int)
 
     args = vars(parser.parse_args())
     data = args['data']
@@ -194,14 +252,25 @@ def main():
     if log.size == 0:
         print(f'[ ERR ] Cannot continue without samples!')
         exit(-1)
+    if args['resample'] is not None:
+        log = resample(log, args['resample'])
+        print(f'[ STEP3 ] After resampling we have {log.size} samples')
+        if log.size == 0:
+            print(f'[  ERR  ] Cannot continue without samples!')
+            exit(-1)
 
     if args['kind'] == 'latency':
         if args['type'] == 'stat':
             latency_stat_plot(log, args['scale'], args['output'])
         elif args['type'] == 'time':
             latency_time_plot(log, args['scale'], args['output'])
+        elif args['type'] == 'ecdf':
+            latency_ecfd_plot(log, args['scale'], args['output'])
+        elif args['type'] == 'pdf':
+            latency_pdf_plot(log, args['scale'], args['output'])
+
     out = IMG_DIR.joinpath(args['output'])
-    print(f'[ DONE ] File saved to { out }')
+    print(f'[  DONE ] File saved to { out }')
 
 
 

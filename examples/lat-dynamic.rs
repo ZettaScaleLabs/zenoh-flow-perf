@@ -34,6 +34,9 @@ static NOOP_URI: &str = "file://./target/release/examples/libdyn_noop.so";
 static SRC_URI: &str = "file://./target/release/examples/libdyn_source.so";
 static SNK_URI: &str = "file://./target/release/examples/libdyn_sink.so";
 
+static PING_SRC_URI: &str = "file://./target/release/examples/libdyn_ping.so";
+static PONG_SNK_URI: &str = "file://./target/release/examples/libdyn_pong.so";
+
 static PORT: &str = "Data";
 
 #[derive(StructOpt, Debug)]
@@ -48,6 +51,8 @@ struct CallArgs {
     name: String,
     #[structopt(short, long, default_value = DEFAULT_RT_DESCRIPTOR)]
     descriptor_file: String,
+    #[structopt(short, long)]
+    ping: bool,
 }
 
 fn write_string_to_file(content: String, filename: &str) {
@@ -148,31 +153,57 @@ async fn main() {
         loops: None,
     };
 
-    // Source
+    // Source and Sink
 
-    let source_descriptor = SourceDescriptor {
-        id: "source".into(),
-        period: None,
-        output: PortDescriptor {
-            port_id: PORT.into(),
-            port_type: "latency".into(),
-        },
-        uri: Some(String::from(SRC_URI)),
-        configuration: config.clone(),
-        runtime: None,
-    };
-
-    // Sink
-
-    let sink_descriptor = SinkDescriptor {
-        id: "sink".into(),
-        input: PortDescriptor {
-            port_id: PORT.into(),
-            port_type: "latency".into(),
-        },
-        uri: Some(String::from(SNK_URI)),
-        configuration: config.clone(),
-        runtime: None,
+    let (source_descriptor, sink_descriptor) = match args.ping {
+        true => {
+            let src = SourceDescriptor {
+                id: "source".into(),
+                period: None,
+                output: PortDescriptor {
+                    port_id: PORT.into(),
+                    port_type: "latency".into(),
+                },
+                uri: Some(String::from(PING_SRC_URI)),
+                configuration: config.clone(),
+                runtime: None,
+            };
+            let snk = SinkDescriptor {
+                id: "sink".into(),
+                input: PortDescriptor {
+                    port_id: PORT.into(),
+                    port_type: "latency".into(),
+                },
+                uri: Some(String::from(PONG_SNK_URI)),
+                configuration: config.clone(),
+                runtime: None,
+            };
+            (src, snk)
+        }
+        false => {
+            let src = SourceDescriptor {
+                id: "source".into(),
+                period: None,
+                output: PortDescriptor {
+                    port_id: PORT.into(),
+                    port_type: "latency".into(),
+                },
+                uri: Some(String::from(SRC_URI)),
+                configuration: config.clone(),
+                runtime: None,
+            };
+            let snk = SinkDescriptor {
+                id: "sink".into(),
+                input: PortDescriptor {
+                    port_id: PORT.into(),
+                    port_type: "latency".into(),
+                },
+                uri: Some(String::from(SNK_URI)),
+                configuration: config.clone(),
+                runtime: None,
+            };
+            (src, snk)
+        }
     };
 
     // Adding source and sinks to descriptor

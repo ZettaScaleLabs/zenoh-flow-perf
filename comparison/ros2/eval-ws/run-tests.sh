@@ -15,7 +15,8 @@ INITIAL_MSGS=1
 FINAL_MSGS=1000000
 
 CHAIN_LENGTH=1
-CHAIN_LENGTH_END=64
+
+CHAIN_LENGTH_END=${CHAIN_LENGTH_END:-64}
 
 source /opt/ros/foxy/setup.bash
 source ./install/setup.bash

@@ -11,8 +11,7 @@ TS=$(date "+%F-%T")
 N_CPU=$(nproc)
 
 INITIAL_MSGS=1
-#FINAL_MSGS=1
-#FINAL_MSGS=1000
+
 FINAL_MSGS=1000000
 
 CHAIN_LENGTH=1
@@ -29,223 +28,254 @@ LAT_SRC_OP_DYNAMIC="lat-source-op-dynamic"
 LAT_ZENOH="lat-zenoh"
 LAT_STATIC="lat-static"
 LAT_DYNAMIC="lat-dynamic"
+PP_ZENOH="ping-pong-zenoh"
+PP_STATIC="ping-pong-static"
 
+OUT_DIR="${OUT_DIR:-breakdown-logs}"
 
-OUT_DIR="breakdown-logs"
-
-DURATION=60
+DURATION=${DURATION:-60}
 
 mkdir -p $OUT_DIR
 
-# Flume
 
-plog "[ START ] baseline Flume Latency test"
-LOG_FILE="$OUT_DIR/flume-$TS.csv"
-echo "layer,scenario,test,name,messages,pipeline,latency,unit" > $LOG_FILE
-s=$INITIAL_MSGS
-while [ $s -le $FINAL_MSGS ]
-do
-   plog "[ RUN ] Flume for msg/s $s"
+plog "[ INIT ] Duration will be $DURATION seconds for each test"
 
-   timeout $DURATION $BIN_DIR/$LAT_FLUME -m $s >> $LOG_FILE
+# # Flume
 
-   ps -ax | grep $LAT_FLUME | awk {'print $1'} | xargs kill -9 > /dev/null  2>&1
+# plog "[ START ] baseline Flume Latency test"
+# LOG_FILE="$OUT_DIR/flume-$TS.csv"
+# echo "layer,scenario,test,name,messages,pipeline,latency,unit" > $LOG_FILE
+# s=$INITIAL_MSGS
+# while [ $s -le $FINAL_MSGS ]
+# do
+#    plog "[ RUN ] Flume for msg/s $s"
 
-   plog "[ DONE ] Flume for msg/s $s"
-   sleep 1
-   echo "Still running $LLAT_FLUMEAT: $(ps -ax | grep $LAT_FLUME | wc -l) - This should be 0"
-   s=$(($s * 10))
+#    timeout $DURATION taskset -c 0,1 $BIN_DIR/$LAT_FLUME -m $s >> $LOG_FILE
 
-done
-plog "[ END ] baseline Flume Latency test"
+#    ps -ax | grep $LAT_FLUME | awk {'print $1'} | xargs kill -9 > /dev/null  2>&1
 
-# ZF Link
+#    plog "[ DONE ] Flume for msg/s $s"
+#    sleep 1
+#    echo "Still running $LLAT_FLUMEAT: $(ps -ax | grep $LAT_FLUME | wc -l) - This should be 0"
+#    s=$(($s * 10))
 
-plog "[ START ] baseline ZF Link Latency test"
-LOG_FILE="$OUT_DIR/zf-link-$TS.csv"
-echo "layer,scenario,test,name,messages,pipeline,latency,unit" > $LOG_FILE
-s=$INITIAL_MSGS
-while [ $s -le $FINAL_MSGS ]
-do
-   plog "[ RUN ] ZF Link for msg/s $s"
+# done
+# plog "[ END ] baseline Flume Latency test"
 
-   timeout $DURATION $BIN_DIR/$LAT_LINK -m $s >> $LOG_FILE
+# # ZF Link
 
-   ps -ax | grep $LAT_LINK | awk {'print $1'} | xargs kill -9 > /dev/null  2>&1
+# plog "[ START ] baseline ZF Link Latency test"
+# LOG_FILE="$OUT_DIR/zf-link-$TS.csv"
+# echo "layer,scenario,test,name,messages,pipeline,latency,unit" > $LOG_FILE
+# s=$INITIAL_MSGS
+# while [ $s -le $FINAL_MSGS ]
+# do
+#    plog "[ RUN ] ZF Link for msg/s $s"
 
-   plog "[ DONE ] ZF Link for msg/s $s"
-   sleep 1
-   echo "Still running $LAT_LINK: $(ps -ax | grep $LAT_LINK | wc -l) - This should be 0"
-   s=$(($s * 10))
+#    timeout $DURATION taskset -c 0,1 $BIN_DIR/$LAT_LINK -m $s >> $LOG_FILE
 
-done
-plog "[ END ] baseline ZF Link Latency test"
+#    ps -ax | grep $LAT_LINK | awk {'print $1'} | xargs kill -9 > /dev/null  2>&1
 
+#    plog "[ DONE ] ZF Link for msg/s $s"
+#    sleep 1
+#    echo "Still running $LAT_LINK: $(ps -ax | grep $LAT_LINK | wc -l) - This should be 0"
+#    s=$(($s * 10))
 
-# Zenoh
-
-plog "[ START ] baseline Zenoh Latency test"
-LOG_FILE="$OUT_DIR/zenoh-$TS.csv"
-echo "layer,scenario,test,name,messages,pipeline,latency,unit" > $LOG_FILE
-s=$INITIAL_MSGS
-while [ $s -le $FINAL_MSGS ]
-do
-   plog "[ RUN ] baseline Zenoh for msg/s $s"
-
-   nohup $BIN_DIR/$LAT_ZENOH -m $s >> $LOG_FILE 2> /dev/null &
-
-   timeout $DURATION $BIN_DIR/$LAT_ZENOH -p -m $s > /dev/null 2>&1
-
-   ps -ax | grep $LAT_ZENOH | awk {'print $1'} | xargs kill -9 > /dev/null  2>&1
-
-   plog "[ DONE ] baseline Zenoh for msg/s $s"
-   sleep 1
-   echo "Still running $LAT_ZENOH: $(ps -ax | grep $LAT_ZENOH | wc -l) - This should be 0"
-
-   s=$(($s * 10))
-done
-plog "[ END ] baseline Zenoh Latency test"
+# done
+# plog "[ END ] baseline ZF Link Latency test"
 
 
-# Static Source->Sink
+# # Static Source->Sink
 
-plog "[ START ] Zenoh Flow Source->Sink Static Latency test"
-LOG_FILE="$OUT_DIR/zf-src-snk-static-$TS.csv"
-echo "layer,scenario,test,name,messages,pipeline,latency,unit" > $LOG_FILE
-s=$INITIAL_MSGS
-while [ $s -le $FINAL_MSGS ]
-do
-   plog "[ RUN ] Zenoh Flow Source->Sink Static for msg/s $s"
+# plog "[ START ] Zenoh Flow Source->Sink Static Latency test"
+# LOG_FILE="$OUT_DIR/zf-src-snk-static-$TS.csv"
+# echo "layer,scenario,test,name,messages,pipeline,latency,unit" > $LOG_FILE
+# s=$INITIAL_MSGS
+# while [ $s -le $FINAL_MSGS ]
+# do
+#    plog "[ RUN ] Zenoh Flow Source->Sink Static for msg/s $s"
 
-   timeout $DURATION $BIN_DIR/$LAT_SRC_SNK_STATIC -m $s >> $LOG_FILE
+#    timeout $DURATION taskset -c 0,1,2 $BIN_DIR/$LAT_SRC_SNK_STATIC -m $s >> $LOG_FILE
 
-   ps -ax | grep $LAT_SRC_SNK_STATIC | awk {'print $1'} | xargs kill -9 > /dev/null  2>&1
+#    ps -ax | grep $LAT_SRC_SNK_STATIC | awk {'print $1'} | xargs kill -9 > /dev/null  2>&1
 
-   plog "[ DONE ] Zenoh Flow Source->Sink Static for msg/s $s"
-   sleep 1
-   echo "Still running $LAT_SRC_SNK_STATIC: $(ps -ax | grep $LAT_SRC_SNK_STATIC | wc -l) - This should be 0"
-   s=$(($s * 10))
+#    plog "[ DONE ] Zenoh Flow Source->Sink Static for msg/s $s"
+#    sleep 1
+#    echo "Still running $LAT_SRC_SNK_STATIC: $(ps -ax | grep $LAT_SRC_SNK_STATIC | wc -l) - This should be 0"
+#    s=$(($s * 10))
 
-done
-plog "[ END ] Zenoh Flow Source->Sink Static Latency test"
+# done
+# plog "[ END ] Zenoh Flow Source->Sink Static Latency test"
 
-# Static Source->Op
+# # Static Source->Op
 
-plog "[ START ] Zenoh Flow Source->Operator Static Latency test"
-LOG_FILE="$OUT_DIR/zf-src-op-static-$TS.csv"
-echo "layer,scenario,test,name,messages,pipeline,latency,unit" > $LOG_FILE
-s=$INITIAL_MSGS
-while [ $s -le $FINAL_MSGS ]
-do
-   plog "[ RUN ] Zenoh Flow Source->Operator Static for msg/s $s"
+# plog "[ START ] Zenoh Flow Source->Operator Static Latency test"
+# LOG_FILE="$OUT_DIR/zf-src-op-static-$TS.csv"
+# echo "layer,scenario,test,name,messages,pipeline,latency,unit" > $LOG_FILE
+# s=$INITIAL_MSGS
+# while [ $s -le $FINAL_MSGS ]
+# do
+#    plog "[ RUN ] Zenoh Flow Source->Operator Static for msg/s $s"
 
-   timeout $DURATION $BIN_DIR/$LAT_SRC_OP_STATIC -m $s >> $LOG_FILE
+#    timeout $DURATION taskset -c 0,1,2 $BIN_DIR/$LAT_SRC_OP_STATIC -m $s >> $LOG_FILE
 
-   ps -ax | grep $LAT_SRC_OP_STATIC | awk {'print $1'} | xargs kill -9 > /dev/null  2>&1
+#    ps -ax | grep $LAT_SRC_OP_STATIC | awk {'print $1'} | xargs kill -9 > /dev/null  2>&1
 
-   plog "[ DONE ] Zenoh Flow Source->Operator Static for msg/s $s"
-   sleep 1
-   echo "Still running $LAT_SRC_OP_STATIC: $(ps -ax | grep $LAT_SRC_OP_STATIC | wc -l) - This should be 0"
-   s=$(($s * 10))
+#    plog "[ DONE ] Zenoh Flow Source->Operator Static for msg/s $s"
+#    sleep 1
+#    echo "Still running $LAT_SRC_OP_STATIC: $(ps -ax | grep $LAT_SRC_OP_STATIC | wc -l) - This should be 0"
+#    s=$(($s * 10))
 
-done
-plog "[ END ] Zenoh Flow Source->Operator Static Latency test"
-
-
-# Dynamic Source->Sink
-
-plog "[ START ] Zenoh Flow Source->Sink Dynamic Latency test"
-LOG_FILE="$OUT_DIR/zf-src-snk-dynamic-$TS.csv"
-echo "layer,scenario,test,name,messages,pipeline,latency,unit" > $LOG_FILE
-s=$INITIAL_MSGS
-while [ $s -le $FINAL_MSGS ]
-do
-   plog "[ RUN ] Zenoh Flow Source->Sink Dynamic for msg/s $s"
-
-   descriptor_file="descriptor-src-snk-$s.yaml"
-
-   $BIN_DIR/$LAT_SRC_SNK_DYNAMIC -m $s -d $descriptor_file > /dev/null 2>&1
-
-   nohup $BIN_DIR/$LAT_SRC_SNK_DYNAMIC -r -n "snk" -d $descriptor_file  >> $LOG_FILE 2> /dev/null &
-
-   timeout $DURATION $BIN_DIR/$LAT_SRC_SNK_DYNAMIC -r -n "src" -d $descriptor_file > /dev/null 2>&1
-
-   ps -ax | grep $LAT_SRC_SNK_DYNAMIC | awk {'print $1'} | xargs kill -9 > /dev/null  2>&1
-
-   plog "[ DONE ] Zenoh Flow Source->Sink Dynamic for msg/s $s"
-   sleep 1
-   echo "Still running $LAT_SRC_SNK_DYNAMIC: $(ps -ax | grep $LAT_SRC_SNK_DYNAMIC | wc -l) - This should be 0"
-   rm $descriptor_file
-   s=$(($s * 10))
-done
-
-sed -i -e 's/zenoh-flow-multi/zf-source-sink-multi/g' $LOG_FILE
-plog "[ END ] Zenoh Flow Source->Sink Dynamic Latency test"
-
-# Dynamic Source->Op
-
-plog "[ START ] Zenoh Flow Source->Operator Dynamic Latency test"
-LOG_FILE="$OUT_DIR/zf-src-op-dynamic-$TS.csv"
-echo "layer,scenario,test,name,messages,pipeline,latency,unit" > $LOG_FILE
-s=$INITIAL_MSGS
-while [ $s -le $FINAL_MSGS ]
-do
-   plog "[ RUN ] Zenoh Flow Source->Operator Dynamic for msg/s $s"
-
-   descriptor_file="descriptor-src-op-$s.yaml"
-
-   $BIN_DIR/$LAT_SRC_OP_DYNAMIC -m $s -d $descriptor_file > /dev/null 2>&1
-
-   nohup $BIN_DIR/$LAT_SRC_OP_DYNAMIC -r -n "comp" -d $descriptor_file >> $LOG_FILE 2> /dev/null &
-   nohup $BIN_DIR/$LAT_SRC_OP_DYNAMIC -r -n "snk" -d $descriptor_file > /dev/null 2>&1 &
-
-   timeout $DURATION $BIN_DIR/$LAT_SRC_OP_DYNAMIC -r -n "src" -d $descriptor_file > /dev/null 2>&1
-
-   ps -ax | grep $LAT_SRC_OP_DYNAMIC | awk {'print $1'} | xargs kill -9 > /dev/null  2>&1
-
-   plog "[ DONE ] Zenoh Flow Source->Operator Dynamic for msg/s $s"
-   sleep 1
-   echo "Still running $LAT_SRC_OP_DYNAMIC: $(ps -ax | grep $LAT_SRC_OP_DYNAMIC | wc -l) - This should be 0"
-   rm $descriptor_file
-   s=$(($s * 10))
-
-done
-plog "[ END ] Zenoh Flow Source->Operator Dynamic Latency test"
+# done
+# plog "[ END ] Zenoh Flow Source->Operator Static Latency test"
 
 
+# # Dynamic Source->Sink
+
+# plog "[ START ] Zenoh Flow Source->Sink Dynamic Latency test"
+# LOG_FILE="$OUT_DIR/zf-src-snk-dynamic-$TS.csv"
+# echo "layer,scenario,test,name,messages,pipeline,latency,unit" > $LOG_FILE
+# s=$INITIAL_MSGS
+# while [ $s -le $FINAL_MSGS ]
+# do
+#    plog "[ RUN ] Zenoh Flow Source->Sink Dynamic for msg/s $s"
+
+#    descriptor_file="descriptor-src-snk-$s.yaml"
+
+#    $BIN_DIR/$LAT_SRC_SNK_DYNAMIC -m $s -d $descriptor_file > /dev/null 2>&1
+
+#    nohup taskset -c 0,1 $BIN_DIR/$LAT_SRC_SNK_DYNAMIC -r -n "snk" -d $descriptor_file  >> $LOG_FILE 2> /dev/null &
+
+#    timeout $DURATION taskset -c 2,3 $BIN_DIR/$LAT_SRC_SNK_DYNAMIC -r -n "src" -d $descriptor_file > /dev/null 2>&1
+
+#    ps -ax | grep $LAT_SRC_SNK_DYNAMIC | awk {'print $1'} | xargs kill -9 > /dev/null  2>&1
+
+#    plog "[ DONE ] Zenoh Flow Source->Sink Dynamic for msg/s $s"
+#    sleep 1
+#    echo "Still running $LAT_SRC_SNK_DYNAMIC: $(ps -ax | grep $LAT_SRC_SNK_DYNAMIC | wc -l) - This should be 0"
+#    rm $descriptor_file
+#    s=$(($s * 10))
+# done
+
+# sed -i -e 's/zenoh-flow-multi/zf-source-sink-multi/g' $LOG_FILE
+# plog "[ END ] Zenoh Flow Source->Sink Dynamic Latency test"
+
+# # Dynamic Source->Op
+
+# plog "[ START ] Zenoh Flow Source->Operator Dynamic Latency test"
+# LOG_FILE="$OUT_DIR/zf-src-op-dynamic-$TS.csv"
+# echo "layer,scenario,test,name,messages,pipeline,latency,unit" > $LOG_FILE
+# s=$INITIAL_MSGS
+# while [ $s -le $FINAL_MSGS ]
+# do
+#    plog "[ RUN ] Zenoh Flow Source->Operator Dynamic for msg/s $s"
+
+#    descriptor_file="descriptor-src-op-$s.yaml"
+
+#    $BIN_DIR/$LAT_SRC_OP_DYNAMIC -m $s -d $descriptor_file > /dev/null 2>&1
+
+#    nohup taskset -c 0,1 $BIN_DIR/$LAT_SRC_OP_DYNAMIC -r -n "comp" -d $descriptor_file >> $LOG_FILE 2> /dev/null &
+#    nohup taskset -c 2,3 $BIN_DIR/$LAT_SRC_OP_DYNAMIC -r -n "snk" -d $descriptor_file > /dev/null 2>&1 &
+
+#    timeout $DURATION taskset -c 2 $BIN_DIR/$LAT_SRC_OP_DYNAMIC -r -n "src" -d $descriptor_file > /dev/null 2>&1
+
+#    ps -ax | grep $LAT_SRC_OP_DYNAMIC | awk {'print $1'} | xargs kill -9 > /dev/null  2>&1
+
+#    plog "[ DONE ] Zenoh Flow Source->Operator Dynamic for msg/s $s"
+#    sleep 1
+#    echo "Still running $LAT_SRC_OP_DYNAMIC: $(ps -ax | grep $LAT_SRC_OP_DYNAMIC | wc -l) - This should be 0"
+#    rm $descriptor_file
+#    s=$(($s * 10))
+
+# done
+# plog "[ END ] Zenoh Flow Source->Operator Dynamic Latency test"
+
+# Static Source->Op->Sink
+
+# plog "[ START ] Zenoh Flow Source->Operator->Sink Static Latency test"
+# LOG_FILE="$OUT_DIR/zf-src-op-sink-static-$TS.csv"
+# echo "layer,scenario,test,name,messages,pipeline,latency,unit" > $LOG_FILE
+# s=$INITIAL_MSGS
+# while [ $s -le $FINAL_MSGS ]
+# do
+#    plog "[ RUN ] Zenoh Flow Source->Operator->Sink Static for msg/s $s"
+
+#    timeout $DURATION taskset -c 0,1,2,3 $BIN_DIR/$LAT_STATIC -m $s -p >> $LOG_FILE
+
+#    ps -ax | grep $LAT_STATIC | awk {'print $1'} | xargs kill -9 > /dev/null  2>&1
+
+#    plog "[ DONE ] Zenoh Flow Source->Operator->Sink Static for msg/s $s"
+#    sleep 1
+#    echo "Still running $LAT_STATIC: $(ps -ax | grep $LAT_STATIC | wc -l) - This should be 0"
+#    rm $descriptor_file
+#    s=$(($s * 10))
+
+# done
+# plog "[ END ] Zenoh Flow Source->Operator->Sink Static Latency test"
 
 
 # Static Source->Op->Sink
 
-plog "[ START ] Zenoh Flow Source->Operator->Sink Static Latency test"
-LOG_FILE="$OUT_DIR/zf-src-op-sink-static-$TS.csv"
-echo "layer,scenario,test,name,messages,pipeline,latency,unit" > $LOG_FILE
-s=$INITIAL_MSGS
-while [ $s -le $FINAL_MSGS ]
-do
-   plog "[ RUN ] Zenoh Flow Source->Operator->Sink Static for msg/s $s"
+# plog "[ START ] Zenoh Flow Source->Operator->Sink Static Latency w/ Ping test"
+# LOG_FILE="$OUT_DIR/zf-src-op-sink-static-pp-$TS.csv"
+# echo "layer,scenario,test,name,messages,pipeline,latency,unit" > $LOG_FILE
+# s=$INITIAL_MSGS
+# while [ $s -le $FINAL_MSGS ]
+# do
+#    plog "[ RUN ] Zenoh Flow Source->Operator->Sink Static for msg/s $s w/ Ping"
 
-   timeout $DURATION $BIN_DIR/$LAT_STATIC -m $s -p >> $LOG_FILE
+#    timeout $DURATION taskset -c 0,1,2,3 $BIN_DIR/$PP_STATIC -m $s -p >> $LOG_FILE
 
-   ps -ax | grep $LAT_STATIC | awk {'print $1'} | xargs kill -9 > /dev/null  2>&1
+#    ps -ax | grep $LAT_STATIC | awk {'print $1'} | xargs kill -9 > /dev/null  2>&1
 
-   plog "[ DONE ] Zenoh Flow Source->Operator->Sink Static for msg/s $s"
-   sleep 1
-   echo "Still running $LAT_STATIC: $(ps -ax | grep $LAT_STATIC | wc -l) - This should be 0"
-   rm $descriptor_file
-   s=$(($s * 10))
+#    plog "[ DONE ] Zenoh Flow Source->Operator->Sink Static for msg/s $s  w/ Ping"
+#    sleep 1
+#    echo "Still running $LAT_STATIC: $(ps -ax | grep $LAT_STATIC | wc -l) - This should be 0"
+#    rm $descriptor_file
+#    s=$(($s * 10))
 
-done
-plog "[ END ] Zenoh Flow Source->Operator->Sink Static Latency test"
+# done
+# plog "[ END ] Zenoh Flow Source->Operator->Sink Static Latency w/ Ping test"
 
 
-plog "Bye!"
+# plog "Bye!"
 
 
 # Dynamic Source->Op->Sink
 
-plog "[ START ] Zenoh Flow Source->Operator->Sink Dynamic Latency test"
-LOG_FILE="$OUT_DIR/zf-src-op-sink-dynamic-$TS.csv"
+# plog "[ START ] Zenoh Flow Source->Operator->Sink Dynamic Latency test"
+# LOG_FILE="$OUT_DIR/zf-src-op-sink-dynamic-$TS.csv"
+# echo "layer,scenario,test,name,messages,pipeline,latency,unit" > $LOG_FILE
+# s=$INITIAL_MSGS
+# while [ $s -le $FINAL_MSGS ]
+# do
+#    plog "[ RUN ] Zenoh Flow Source->Operator->Sink Dynamic for msg/s $s"
+
+#    descriptor_file="descriptor-src-op-sink-$s.yaml"
+
+#    $BIN_DIR/$LAT_DYNAMIC -m $s -d $descriptor_file > /dev/null 2>&1
+
+#    nohup taskset -c 0,1 $BIN_DIR/$LAT_DYNAMIC -r -n "comp0" -d $descriptor_file > /dev/null 2>&1 &
+#    nohup taskset -c 2,3 $BIN_DIR/$LAT_DYNAMIC -r -n "snk" -d $descriptor_file >> $LOG_FILE 2> /dev/null &
+
+#    timeout $DURATION taskset -c 4,5 $BIN_DIR/$LAT_DYNAMIC -r -n "src" -d $descriptor_file > /dev/null 2>&1
+
+#    ps -ax | grep $LAT_DYNAMIC | awk {'print $1'} | xargs kill -9 > /dev/null  2>&1
+
+#    plog "[ DONE ] Zenoh Flow Source->Operator->Sink Dynamic for msg/s $s"
+#    sleep 1
+#    echo "Still running $LAT_DYNAMIC: $(ps -ax | grep $LAT_DYNAMIC | wc -l) - This should be 0"
+#    rm $descriptor_file
+#    s=$(($s * 10))
+
+# done
+# plog "[ END ] Zenoh Flow Source->Operator->Sink Dynamic Latency test"
+
+
+# Dynamic Source->Op->Sink
+
+plog "[ START ] Zenoh Flow Source->Operator->Sink Dynamic Latency w/ Ping test"
+LOG_FILE="$OUT_DIR/zf-src-op-sink-dynamic-pp-$TS.csv"
 echo "layer,scenario,test,name,messages,pipeline,latency,unit" > $LOG_FILE
 s=$INITIAL_MSGS
 while [ $s -le $FINAL_MSGS ]
@@ -254,52 +284,130 @@ do
 
    descriptor_file="descriptor-src-op-sink-$s.yaml"
 
-   $BIN_DIR/$LAT_DYNAMIC -m $s -d $descriptor_file > /dev/null 2>&1
+   $BIN_DIR/$LAT_DYNAMIC --ping -m $s -d $descriptor_file > /dev/null 2>&1
 
-   nohup $BIN_DIR/$LAT_DYNAMIC -r -n "comp0" -d $descriptor_file > /dev/null 2>&1 &
-   nohup $BIN_DIR/$LAT_DYNAMIC -r -n "snk" -d $descriptor_file >> $LOG_FILE 2> /dev/null &
+   nohup taskset -c 0,1 $BIN_DIR/$LAT_DYNAMIC -r -n "comp0" -d $descriptor_file > /dev/null 2>&1 &
+   nohup taskset -c 2,3 $BIN_DIR/$LAT_DYNAMIC -r -n "snk" -d $descriptor_file >> $LOG_FILE 2> /dev/null &
 
-   timeout $DURATION $BIN_DIR/$LAT_DYNAMIC -r -n "src" -d $descriptor_file > /dev/null 2>&1
+   sleep 3
+
+   timeout $DURATION taskset -c 4,5 $BIN_DIR/$LAT_DYNAMIC -r -n "src" -d $descriptor_file > /dev/null 2>&1
 
    ps -ax | grep $LAT_DYNAMIC | awk {'print $1'} | xargs kill -9 > /dev/null  2>&1
 
-   plog "[ DONE ] Zenoh Flow Source->Operator->Sink Dynamic for msg/s $s"
+   plog "[ DONE ] Zenoh Flow Source->Operator->Sink Dynamic for msg/s $s w/ Ping"
    sleep 1
    echo "Still running $LAT_DYNAMIC: $(ps -ax | grep $LAT_DYNAMIC | wc -l) - This should be 0"
    rm $descriptor_file
    s=$(($s * 10))
 
 done
-plog "[ END ] Zenoh Flow Source->Operator->Sink Dynamic Latency test"
+plog "[ END ] Zenoh Flow Source->Operator->Sink Dynamic Latency w/ Ping test"
 
 
+# # Zenoh
 
-# Zenoh UDP
+# plog "[ START ] baseline Zenoh Latency test"
+# LOG_FILE="$OUT_DIR/zenoh-$TS.csv"
+# echo "layer,scenario,test,name,messages,pipeline,latency,unit" > $LOG_FILE
+# s=$INITIAL_MSGS
+# while [ $s -le $FINAL_MSGS ]
+# do
+#    plog "[ RUN ] baseline Zenoh for msg/s $s"
 
-plog "[ START ] baseline Zenoh UDP Latency test"
-LOG_FILE="$OUT_DIR/zenoh-udp-$TS.csv"
-echo "layer,scenario,test,name,messages,pipeline,latency,unit" > $LOG_FILE
-s=$INITIAL_MSGS
-while [ $s -le $FINAL_MSGS ]
-do
-   plog "[ RUN ] baseline Zenoh for msg/s $s"
+#    nohup taskset -c 0 $BIN_DIR/$LAT_ZENOH -m $s >> $LOG_FILE 2> /dev/null &
 
-   nohup $BIN_DIR/$LAT_ZENOH -u -m $s >> $LOG_FILE 2> /dev/null &
+#    timeout $DURATION taskset -c 1 $BIN_DIR/$LAT_ZENOH -p -m $s > /dev/null 2>&1
 
-   timeout $DURATION $BIN_DIR/$LAT_ZENOH -u -p -m $s > /dev/null 2>&1
+#    ps -ax | grep $LAT_ZENOH | awk {'print $1'} | xargs kill -9 > /dev/null  2>&1
 
-   ps -ax | grep $LAT_ZENOH | awk {'print $1'} | xargs kill -9 > /dev/null  2>&1
+#    plog "[ DONE ] baseline Zenoh for msg/s $s"
+#    sleep 1
+#    echo "Still running $LAT_ZENOH: $(ps -ax | grep $LAT_ZENOH | wc -l) - This should be 0"
 
-   plog "[ DONE ] baseline Zenoh UDP for msg/s $s"
-   sleep 1
-   echo "Still running $LAT_ZENOH: $(ps -ax | grep $LAT_ZENOH | wc -l) - This should be 0"
+#    s=$(($s * 10))
+# done
+# plog "[ END ] baseline Zenoh Latency test"
 
-   s=$(($s * 10))
-done
-plog "[ END ] baseline Zenoh UDP Latency test"
+# # Zenoh UDP
+
+# plog "[ START ] baseline Zenoh UDP Latency test"
+# LOG_FILE="$OUT_DIR/zenoh-udp-$TS.csv"
+# echo "layer,scenario,test,name,messages,pipeline,latency,unit" > $LOG_FILE
+# s=$INITIAL_MSGS
+# while [ $s -le $FINAL_MSGS ]
+# do
+#    plog "[ RUN ] baseline Zenoh UDP for msg/s $s"
+
+#    nohup taskset -c 0 $BIN_DIR/$LAT_ZENOH -u -m $s >> $LOG_FILE 2> /dev/null &
+
+#    timeout $DURATION taskset -c 1 $BIN_DIR/$LAT_ZENOH -u -p -m $s > /dev/null 2>&1
+
+#    ps -ax | grep $LAT_ZENOH | awk {'print $1'} | xargs kill -9 > /dev/null  2>&1
+
+#    plog "[ DONE ] baseline Zenoh UDP for msg/s $s"
+#    sleep 1
+#    echo "Still running $LAT_ZENOH: $(ps -ax | grep $LAT_ZENOH | wc -l) - This should be 0"
+
+#    s=$(($s * 10))
+# done
+# plog "[ END ] baseline Zenoh UDP Latency test"
 
 
-plog "Bye!"
+# # Zenoh ping
+
+# plog "[ START ] baseline Zenoh Latency test"
+# LOG_FILE="$OUT_DIR/zenoh-pp-$TS.csv"
+# echo "layer,scenario,test,name,messages,pipeline,latency,unit" > $LOG_FILE
+# s=$INITIAL_MSGS
+# while [ $s -le $FINAL_MSGS ]
+# do
+#    plog "[ RUN ] baseline Zenoh for msg/s $s"
+
+#    nohup taskset -c 0 $BIN_DIR/$PP_ZENOH -m $s >> $LOG_FILE 2> /dev/null &
+
+#    sleep 3
+
+#    timeout $DURATION taskset -c 1 $BIN_DIR/$PP_ZENOH -p -m $s > /dev/null 2>&1
+
+#    ps -ax | grep $PP_ZENOH | awk {'print $1'} | xargs kill -9 > /dev/null  2>&1
+
+#    plog "[ DONE ] baseline Zenoh for msg/s $s"
+#    sleep 1
+#    echo "Still running $PP_ZENOH: $(ps -ax | grep $PP_ZENOH | wc -l) - This should be 0"
+
+#    s=$(($s * 10))
+# done
+# plog "[ END ] baseline Zenoh Latency test"
+
+# # Zenoh UDP ping
+
+# plog "[ START ] baseline Zenoh UDP Latency test"
+# LOG_FILE="$OUT_DIR/zenoh-udp-pp-$TS.csv"
+# echo "layer,scenario,test,name,messages,pipeline,latency,unit" > $LOG_FILE
+# s=$INITIAL_MSGS
+# while [ $s -le $FINAL_MSGS ]
+# do
+#    plog "[ RUN ] baseline Zenoh UDP for msg/s $s"
+
+#    nohup taskset -c 1 $BIN_DIR/$PP_ZENOH -u -m $s >> $LOG_FILE 2> /dev/null &
+
+#    sleep 3
+
+#    timeout $DURATION taskset -c 0 $BIN_DIR/$PP_ZENOH -u -p -m $s > /dev/null 2>&1
+
+#    ps -ax | grep $PP_ZENOH | awk {'print $1'} | xargs kill -9 > /dev/null  2>&1
+
+#    plog "[ DONE ] baseline Zenoh UDP for msg/s $s"
+#    sleep 1
+#    echo "Still running $PP_ZENOH: $(ps -ax | grep $PP_ZENOH | wc -l) - This should be 0"
+
+#    s=$(($s * 10))
+# done
+# plog "[ END ] baseline Zenoh UDP Latency test"
+
+
+# plog "Bye!"
 
 
 # get TCP sizes:
@@ -325,11 +433,11 @@ plog "Bye!"
 
 # windowd scale factor
 #cubic wscale:7,7
-# re-transmission timeout in ms
+# re-transmission timeout $DURATION in ms
 #rto:204
 # avg rtt/men dev rtt in ms
 #rtt:0.066/0.007
-# ack timeout in ms
+# ack timeout $DURATION in ms
 #ato:40
 # max segment size
 #mss:32768

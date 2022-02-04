@@ -14,6 +14,9 @@ import argparse
 palette = 'bright' #sns.color_palette("bright", 6) #'plasma'
 IMG_DIR = Path('img')
 
+def pairwise(data):
+    l = iter(data)
+    return zip(l,l)
 
 def interval_label(n):
     if n == 0:
@@ -106,6 +109,52 @@ def resample(log, downsampled_interval=1):
     log = log.iloc[::step_size, :]
     log = log.reset_index()
     return log
+
+def compute_overhead(log, overhead):
+    couples = []
+    for (x,y) in pairwise(overhead):
+        couples.append((x,y))
+
+    # overhead computes only with pipeline size equal to 1 (src->op->snk)
+    log=log[log['pipeline']==1]
+
+    log_overhead = pd.DataFrame(columns=log.columns)
+    i = 0
+    dfs = {'layer':[],'test':[],'scenario':[],'name':[],'pipeline':[],'messages':[],'unit':[],'label':[],'counter':[],'latency':[]}
+    for (x,y) in couples:
+
+        # layer,scenario,test,name,messages,pipeline,latency,unit
+        msgs = log['messages'].unique()
+
+        log_y = log[log['layer']==y]
+        log_x = log[log['layer']==x]
+
+        for m in msgs:
+            df_x = log_x[log_x['messages']==m]
+
+            median_latency_x = np.median(df_x['latency'])*2
+
+            df_y = log_y[log_y['messages']==m]
+
+            median_latency_y = np.median(df_y['latency'])
+
+            latency_diff = median_latency_y - median_latency_x
+
+            dfs['layer'].append(f'{y}-overhead')
+            dfs['test'].append('latency')
+            dfs['scenario'].append('overhead')
+            dfs['name'].append('overhead')
+            dfs['pipeline'].append(1)
+            dfs['messages'].append(m)
+            dfs['unit'].append('us')
+            dfs['label'].append(interval_label(m))
+            dfs['latency'].append(latency_diff)
+            dfs['counter'].append(i)
+            i+=1
+
+    log_overhead = pd.concat([log_overhead, pd.DataFrame.from_dict(dfs)])
+
+    return log_overhead
 
 def latency_ecfd_plot(log, scale, outfile):
 
@@ -237,6 +286,7 @@ def main():
     parser.add_argument('-l','--length', help='Filter for this pipeline length', required=False, type=int)
     parser.add_argument('-o','--output', help='Output file name', required=False, type=str, default='plot.pdf')
     parser.add_argument('-r','--resample', help='Resample the data', required=False, type=int)
+    parser.add_argument('--overhead', help="Compute the overhead", required=False, nargs='+', default=[])
 
     args = vars(parser.parse_args())
     data = args['data']
@@ -255,6 +305,13 @@ def main():
     if args['resample'] is not None:
         log = resample(log, args['resample'])
         print(f'[ STEP3 ] After resampling we have {log.size} samples')
+        if log.size == 0:
+            print(f'[  ERR  ] Cannot continue without samples!')
+            exit(-1)
+
+    if len(args['overhead']) > 0 and len(args['overhead']) % 2 == 0:
+        log = compute_overhead(log, args['overhead'])
+        print(f'[ STEP4 ] After computing overhead we have {log.size} samples')
         if log.size == 0:
             print(f'[  ERR  ] Cannot continue without samples!')
             exit(-1)

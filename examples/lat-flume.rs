@@ -48,7 +48,6 @@ async fn main() {
             // layer,scenario name,test kind, test name, payload size, msg/s, pipeline size, latency, unit
             println!("flume,scenario-name,latency,pipeline,{c_msgs},{pipeline_msgs},{elapsed},us");
             sender_pong.send_async(()).await.unwrap();
-
         }
     });
 

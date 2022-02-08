@@ -12,51 +12,10 @@
 //   ADLINK zenoh team, <zenoh@adlink-labs.tech>
 //
 
-use async_trait::async_trait;
-use std::time::Duration;
 use zenoh_flow::async_std::sync::Arc;
-use zenoh_flow::zenoh_flow_derive::ZFState;
-use zenoh_flow::{export_source, types::ZFResult, Configuration, Data, Node, State};
-use zenoh_flow::{Context, Source};
-use zenoh_flow_perf::{get_epoch_us, Latency};
-
-// SOURCE
-
-#[derive(Debug)]
-struct LatSource;
-
-#[derive(Debug, ZFState)]
-struct LatSourceState {
-    interval: f64,
-}
-
-#[async_trait]
-impl Source for LatSource {
-    async fn run(&self, _context: &mut Context, state: &mut State) -> zenoh_flow::ZFResult<Data> {
-        let real_state = state.try_get::<LatSourceState>()?;
-
-        async_std::task::sleep(Duration::from_secs_f64(real_state.interval)).await;
-
-        let msg = Latency { ts: get_epoch_us() };
-
-        Ok(Data::from::<Latency>(msg))
-    }
-}
-
-impl Node for LatSource {
-    fn initialize(&self, configuration: &Option<Configuration>) -> ZFResult<State> {
-        let interval = match configuration {
-            Some(conf) => conf["interval"].as_f64().unwrap(),
-            None => 1.0f64,
-        };
-
-        Ok(State::from(LatSourceState { interval }))
-    }
-
-    fn finalize(&self, _state: &mut State) -> ZFResult<()> {
-        Ok(())
-    }
-}
+use zenoh_flow::Source;
+use zenoh_flow::{export_source, types::ZFResult};
+use zenoh_flow_perf::operators::LatSource;
 
 export_source!(register);
 

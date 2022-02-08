@@ -15,10 +15,10 @@
 use zenoh_flow::async_std::sync::Arc;
 use zenoh_flow::Sink;
 use zenoh_flow::{export_sink, types::ZFResult};
-use zenoh_flow_perf::operators::PongSink;
+use zenoh_flow_perf::operators::ScalPongSink;
 
 export_sink!(register);
 
 fn register() -> ZFResult<Arc<dyn Sink>> {
-    Ok(Arc::new(PongSink) as Arc<dyn Sink>)
+    Ok(Arc::new(ScalPongSink) as Arc<dyn Sink>)
 }

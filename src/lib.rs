@@ -12,10 +12,22 @@
 //   ADLINK zenoh team, <zenoh@adlink-labs.tech>
 //
 
+use std::fs::File;
+use std::io::Write;
+use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 use zenoh_flow::serde::{Deserialize, Serialize};
 use zenoh_flow::zenoh_flow_derive::ZFData;
 use zenoh_flow::{Deserializable, ZFData, ZFError, ZFResult};
+
+pub mod operators;
+pub mod runtime;
+
+pub fn write_string_to_file(content: String, filename: &str) {
+    let path = Path::new(filename);
+    let mut write_file = File::create(path).unwrap();
+    write!(write_file, "{content}").unwrap();
+}
 
 #[derive(Debug, Clone, ZFData, Serialize, Deserialize)]
 pub struct ThrData {

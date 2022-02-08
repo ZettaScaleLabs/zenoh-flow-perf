@@ -14,13 +14,13 @@
 
 use async_std::stream::StreamExt;
 use rand::Rng;
+use std::io::{self, Write};
 use std::time::Duration;
 use structopt::StructOpt;
 use zenoh::prelude::*;
 use zenoh::publication::CongestionControl;
 use zenoh_flow::{Data, Message};
 use zenoh_flow_perf::{get_epoch_us, Latency};
-use std::io::{self, Write};
 
 static DEFAULT_PIPELINE: &str = "1";
 static DEFAULT_MSGS: &str = "1";

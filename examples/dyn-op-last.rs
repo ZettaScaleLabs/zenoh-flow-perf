@@ -13,12 +13,11 @@
 //
 
 use zenoh_flow::async_std::sync::Arc;
-use zenoh_flow::Sink;
-use zenoh_flow::{export_sink, types::ZFResult};
-use zenoh_flow_perf::operators::PongSink;
+use zenoh_flow::{export_operator, types::ZFResult, Operator};
+use zenoh_flow_perf::operators::IRNoOp;
 
-export_sink!(register);
+export_operator!(register);
 
-fn register() -> ZFResult<Arc<dyn Sink>> {
-    Ok(Arc::new(PongSink) as Arc<dyn Sink>)
+fn register() -> ZFResult<Arc<dyn Operator>> {
+    Ok(Arc::new(IRNoOp) as Arc<dyn Operator>)
 }

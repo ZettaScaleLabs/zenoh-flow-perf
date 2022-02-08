@@ -12,64 +12,10 @@
 //   ADLINK zenoh team, <zenoh@adlink-labs.tech>
 //
 
-use std::collections::HashMap;
 use zenoh_flow::async_std::sync::Arc;
-use zenoh_flow::{
-    default_input_rule, default_output_rule, export_operator, types::ZFResult, zf_empty_state,
-    Configuration, Data, LocalDeadlineMiss, Node, NodeOutput, Operator, PortId, State,
-};
+use zenoh_flow::{export_operator, types::ZFResult, Operator};
 
-static PORT: &str = "Data";
-
-// OPERATOR
-
-#[derive(Debug)]
-struct NoOp;
-
-impl Operator for NoOp {
-    fn input_rule(
-        &self,
-        _context: &mut zenoh_flow::Context,
-        state: &mut State,
-        tokens: &mut HashMap<PortId, zenoh_flow::InputToken>,
-    ) -> zenoh_flow::ZFResult<bool> {
-        default_input_rule(state, tokens)
-    }
-
-    fn run(
-        &self,
-        _context: &mut zenoh_flow::Context,
-        _state: &mut State,
-        inputs: &mut HashMap<PortId, zenoh_flow::runtime::message::DataMessage>,
-    ) -> zenoh_flow::ZFResult<HashMap<zenoh_flow::PortId, Data>> {
-        let mut results: HashMap<PortId, Data> = HashMap::new();
-
-        let data = inputs.get_mut(PORT).unwrap().get_inner_data().clone();
-
-        results.insert(PORT.into(), data);
-        Ok(results)
-    }
-
-    fn output_rule(
-        &self,
-        _context: &mut zenoh_flow::Context,
-        state: &mut State,
-        outputs: HashMap<PortId, Data>,
-        _deadline_miss: Option<LocalDeadlineMiss>,
-    ) -> zenoh_flow::ZFResult<HashMap<zenoh_flow::PortId, NodeOutput>> {
-        default_output_rule(state, outputs)
-    }
-}
-
-impl Node for NoOp {
-    fn initialize(&self, _configuration: &Option<Configuration>) -> ZFResult<State> {
-        zf_empty_state!()
-    }
-
-    fn finalize(&self, _state: &mut State) -> ZFResult<()> {
-        Ok(())
-    }
-}
+use zenoh_flow_perf::operators::NoOp;
 
 export_operator!(register);
 

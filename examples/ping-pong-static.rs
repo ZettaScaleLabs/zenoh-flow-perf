@@ -12,31 +12,18 @@
 //   ADLINK zenoh team, <zenoh@adlink-labs.tech>
 //
 
-use async_trait::async_trait;
-use std::collections::HashMap;
-use std::time::Duration;
 use structopt::StructOpt;
-use zenoh::subscriber::Subscriber;
 use zenoh_flow::async_std::sync::Arc;
 use zenoh_flow::model::{InputDescriptor, OutputDescriptor};
 use zenoh_flow::runtime::dataflow::instance::DataflowInstance;
 use zenoh_flow::runtime::dataflow::loader::{Loader, LoaderConfig};
 use zenoh_flow::runtime::RuntimeContext;
-use zenoh_flow::zenoh_flow_derive::ZFState;
-use zenoh_flow::{
-    default_input_rule, default_output_rule, model::link::PortDescriptor, zf_empty_state,
-    Configuration, Context, Data, LocalDeadlineMiss, Node, NodeOutput, Operator, PortId, Sink,
-    Source, State, ZFResult,
-};
+use zenoh_flow::{model::link::PortDescriptor, Node};
 
-use zenoh::prelude::*;
-use zenoh::publication::CongestionControl;
-
-use zenoh_flow_perf::{get_epoch_us, Latency};
+use zenoh_flow_perf::operators::{NoOp, PingSource, PongSink, LAT_PORT};
 
 static DEFAULT_PIPELINE: &str = "1";
 static DEFAULT_MSGS: &str = "1";
-static PORT: &str = "Data";
 
 #[derive(StructOpt, Debug)]
 struct CallArgs {
@@ -44,215 +31,6 @@ struct CallArgs {
     pipeline: u64,
     #[structopt(short, long, default_value = DEFAULT_MSGS)]
     msgs: u64,
-}
-
-// SOURCE
-
-#[derive(Debug)]
-struct PingSource;
-
-#[derive(Debug, ZFState)]
-struct PingSourceState {
-    interval: f64,
-    sub: Subscriber<'static>,
-    first: bool,
-}
-
-impl PingSourceState {
-    fn new(interval: f64, sub: Subscriber<'static>) -> Self {
-        Self {
-            interval,
-            sub,
-            first: true,
-        }
-    }
-}
-
-#[async_trait]
-impl Source for PingSource {
-    async fn run(&self, _context: &mut Context, state: &mut State) -> zenoh_flow::ZFResult<Data> {
-        let mut real_state = state.try_get::<PingSourceState>()?;
-
-        async_std::task::sleep(Duration::from_secs_f64(real_state.interval)).await;
-        if !real_state.first {
-            let _ = real_state.sub.recv();
-        } else {
-            real_state.first = false;
-        }
-
-        let msg = Latency { ts: get_epoch_us() };
-
-        Ok(Data::from::<Latency>(msg))
-    }
-}
-
-impl Node for PingSource {
-    fn initialize(&self, configuration: &Option<Configuration>) -> ZFResult<State> {
-        let interval = match configuration {
-            Some(conf) => conf["interval"].as_f64().unwrap(),
-            None => 1.0f64,
-        };
-
-        let mut config = zenoh::config::Config::default();
-        config
-            .set_mode(Some(zenoh::config::whatami::WhatAmI::Peer))
-            .unwrap();
-        let session = zenoh::open(config).wait().unwrap().into_arc();
-
-        let key_expr_pong = session
-            .declare_expr("/test/latency/zf/pong")
-            .wait()
-            .unwrap();
-
-        let sub = session.subscribe(&key_expr_pong).wait().unwrap();
-
-        Ok(State::from(PingSourceState::new(interval, sub)))
-    }
-
-    fn finalize(&self, _state: &mut State) -> ZFResult<()> {
-        Ok(())
-    }
-}
-
-// SINK
-
-struct PongSink;
-
-#[derive(ZFState, Debug, Clone)]
-struct PongSinkState {
-    pipeline: u64,
-    interval: f64,
-    msgs: u64,
-    session: Arc<zenoh::Session>,
-    expr: ExprId,
-    data: Vec<u8>,
-}
-
-#[async_trait]
-impl Sink for PongSink {
-    async fn run(
-        &self,
-        _context: &mut Context,
-        state: &mut State,
-        mut input: zenoh_flow::runtime::message::DataMessage,
-    ) -> zenoh_flow::ZFResult<()> {
-        let real_state = state.try_get::<PongSinkState>()?;
-        let _ = real_state.interval;
-
-        let data = input.get_inner_data().try_get::<Latency>()?;
-
-        let now = get_epoch_us();
-
-        let elapsed = now - data.ts;
-        let msgs = real_state.msgs;
-        let pipeline = real_state.pipeline;
-        // layer,scenario name,test kind, test name, payload size, msg/s, pipeline size, latency, unit
-        println!("zenoh-flow,scenario,latency,pipeline,{msgs},{pipeline},{elapsed},us");
-
-        // pong back
-        real_state
-            .session
-            .put(&real_state.expr, real_state.data.clone())
-            .congestion_control(CongestionControl::Block)
-            .await?;
-
-        Ok(())
-    }
-}
-
-impl Node for PongSink {
-    fn initialize(&self, configuration: &Option<Configuration>) -> ZFResult<State> {
-        let interval = match configuration {
-            Some(conf) => conf["interval"].as_f64().unwrap(),
-            None => 1.0f64,
-        };
-
-        let pipeline = match configuration {
-            Some(conf) => conf["pipeline"].as_u64().unwrap(),
-            None => 1u64,
-        };
-
-        let msgs = match configuration {
-            Some(conf) => conf["msgs"].as_u64().unwrap(),
-            None => 1u64,
-        };
-
-        let mut config = zenoh::config::Config::default();
-        config
-            .set_mode(Some(zenoh::config::whatami::WhatAmI::Peer))
-            .unwrap();
-        let session = zenoh::open(config).wait().unwrap().into_arc();
-
-        let expr = session
-            .declare_expr("/test/latency/zf/pong")
-            .wait()
-            .unwrap();
-
-        Ok(State::from(PongSinkState {
-            interval,
-            pipeline,
-            msgs,
-            session,
-            expr,
-            data: vec![],
-        }))
-    }
-
-    fn finalize(&self, state: &mut State) -> ZFResult<()> {
-        let _real_state = state.try_get::<PongSinkState>()?;
-
-        Ok(())
-    }
-}
-
-// OPERATOR
-
-#[derive(Debug)]
-struct NoOp;
-
-impl Operator for NoOp {
-    fn input_rule(
-        &self,
-        _context: &mut zenoh_flow::Context,
-        state: &mut State,
-        tokens: &mut HashMap<PortId, zenoh_flow::InputToken>,
-    ) -> zenoh_flow::ZFResult<bool> {
-        default_input_rule(state, tokens)
-    }
-
-    fn run(
-        &self,
-        _context: &mut zenoh_flow::Context,
-        _state: &mut State,
-        inputs: &mut HashMap<PortId, zenoh_flow::runtime::message::DataMessage>,
-    ) -> zenoh_flow::ZFResult<HashMap<zenoh_flow::PortId, Data>> {
-        let mut results: HashMap<PortId, Data> = HashMap::new();
-
-        let data = inputs.get_mut(PORT).unwrap().get_inner_data().clone();
-
-        results.insert(PORT.into(), data);
-        Ok(results)
-    }
-
-    fn output_rule(
-        &self,
-        _context: &mut zenoh_flow::Context,
-        state: &mut State,
-        outputs: HashMap<PortId, Data>,
-        _deadline_miss: Option<LocalDeadlineMiss>,
-    ) -> zenoh_flow::ZFResult<HashMap<zenoh_flow::PortId, NodeOutput>> {
-        default_output_rule(state, outputs)
-    }
-}
-
-impl Node for NoOp {
-    fn initialize(&self, _configuration: &Option<Configuration>) -> ZFResult<State> {
-        zf_empty_state!()
-    }
-
-    fn finalize(&self, _state: &mut State) -> ZFResult<()> {
-        Ok(())
-    }
 }
 
 // Run dataflow in single runtime
@@ -299,7 +77,7 @@ async fn main() {
             "lat-source".into(),
             None,
             PortDescriptor {
-                port_id: String::from(PORT).into(),
+                port_id: String::from(LAT_PORT).into(),
                 port_type: String::from("lat").into(),
             },
             source.initialize(&config).unwrap(),
@@ -311,7 +89,7 @@ async fn main() {
         .try_add_static_sink(
             "lat-sink".into(),
             PortDescriptor {
-                port_id: String::from(PORT).into(),
+                port_id: String::from(LAT_PORT).into(),
                 port_type: String::from("lat").into(),
             },
             sink.initialize(&config).unwrap(),
@@ -324,11 +102,11 @@ async fn main() {
             .try_add_static_operator(
                 format!("noop{i}").into(),
                 vec![PortDescriptor {
-                    port_id: String::from(PORT).into(),
+                    port_id: String::from(LAT_PORT).into(),
                     port_type: String::from("lat").into(),
                 }],
                 vec![PortDescriptor {
-                    port_id: String::from(PORT).into(),
+                    port_id: String::from(LAT_PORT).into(),
                     port_type: String::from("lat").into(),
                 }],
                 None,
@@ -343,11 +121,11 @@ async fn main() {
         .try_add_link(
             OutputDescriptor {
                 node: "lat-source".into(),
-                output: String::from(PORT).into(),
+                output: String::from(LAT_PORT).into(),
             },
             InputDescriptor {
                 node: format!("noop0").into(),
-                input: String::from(PORT).into(),
+                input: String::from(LAT_PORT).into(),
             },
             None,
             None,
@@ -364,11 +142,11 @@ async fn main() {
             .try_add_link(
                 OutputDescriptor {
                     node: format!("noop{j}").into(),
-                    output: String::from(PORT).into(),
+                    output: String::from(LAT_PORT).into(),
                 },
                 InputDescriptor {
                     node: format!("noop{i}").into(),
-                    input: String::from(PORT).into(),
+                    input: String::from(LAT_PORT).into(),
                 },
                 None,
                 None,
@@ -383,11 +161,11 @@ async fn main() {
         .try_add_link(
             OutputDescriptor {
                 node: format!("noop{len}").into(),
-                output: String::from(PORT).into(),
+                output: String::from(LAT_PORT).into(),
             },
             InputDescriptor {
                 node: "lat-sink".into(),
-                input: String::from(PORT).into(),
+                input: String::from(LAT_PORT).into(),
             },
             None,
             None,

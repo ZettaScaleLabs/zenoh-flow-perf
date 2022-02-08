@@ -39,7 +39,8 @@ async fn main() {
 
     let send_id = String::from("0");
     let recv_id = String::from("10");
-    let (sender_ping, receiver_ping) = link::<Latency>(None, send_id.clone().into(), recv_id.clone().into());
+    let (sender_ping, receiver_ping) =
+        link::<Latency>(None, send_id.clone().into(), recv_id.clone().into());
     let (sender_pong, receiver_pong) = link::<()>(None, recv_id.into(), send_id.into());
 
     let c_msgs = args.msgs.clone();
@@ -55,7 +56,6 @@ async fn main() {
             );
 
             sender_pong.send(Arc::new(())).await.unwrap();
-
         }
     });
 

@@ -67,8 +67,7 @@ async fn main() {
 
     // let operator = Arc::new(NoOp {});
 
-    let config =
-        serde_json::json!({"interval" : interval, "pipeline":args.pipeline, "msgs": args.msgs});
+    let config = serde_json::json!({"interval" : interval, "pipeline":args.pipeline, "msgs": args.msgs, "multi":false});
     let config = Some(config);
 
     zf_graph
@@ -177,8 +176,23 @@ async fn main() {
 
     let mut instance = DataflowInstance::try_instantiate(zf_graph).unwrap();
 
-    let nodes = instance.get_nodes();
-    for id in &nodes {
+    let mut sinks = instance.get_sinks();
+    for id in sinks.drain(..) {
+        instance.start_node(&id).await.unwrap()
+    }
+
+    let mut operators = instance.get_operators();
+    for id in operators.drain(..) {
+        instance.start_node(&id).await.unwrap()
+    }
+
+    let mut connectors = instance.get_connectors();
+    for id in connectors.drain(..) {
+        instance.start_node(&id).await.unwrap()
+    }
+
+    let sources = instance.get_sources();
+    for id in &sources {
         instance.start_node(id).await.unwrap()
     }
 

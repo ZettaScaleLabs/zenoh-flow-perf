@@ -132,7 +132,7 @@ async fn main() {
     let interval = 1.0 / (args.msgs as f64);
 
     let config = Some(
-        serde_json::json!({"interval" : interval, "pipeline":args.pipeline, "msgs": args.msgs}),
+        serde_json::json!({"interval" : interval, "pipeline":args.pipeline, "msgs": args.msgs, "multi":true}),
     );
 
     // Creating the descriptor

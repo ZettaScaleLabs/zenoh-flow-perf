@@ -12,6 +12,7 @@
 //   ADLINK zenoh team, <zenoh@adlink-labs.tech>
 //
 
+use serde_json::Value;
 use std::collections::HashMap;
 use std::str::FromStr;
 use structopt::StructOpt;
@@ -19,7 +20,7 @@ use zenoh_flow::model::dataflow::descriptor::{DataFlowDescriptor, Mapping};
 use zenoh_flow::model::link::{LinkDescriptor, PortDescriptor};
 use zenoh_flow::model::node::{OperatorDescriptor, SinkDescriptor, SourceDescriptor};
 use zenoh_flow::model::{InputDescriptor, OutputDescriptor};
-
+use zenoh_flow_perf::operators::LAT_PORT;
 static DEFAULT_FACTOR: &str = "0";
 static DEFAULT_FANKIND: &str = "in";
 static DEFAULT_MSGS: &str = "1";
@@ -31,8 +32,6 @@ static LASTOP_URI: &str = "file://./target/release/examples/libdyn_op_last.so";
 
 static PING_SRC_URI: &str = "file://./target/release/examples/libdyn_ping.so";
 static PONG_SNK_URI: &str = "file://./target/release/examples/libdyn_pong_scal.so";
-
-static PORT: &str = "Data";
 
 type ParseError = &'static str;
 
@@ -84,9 +83,14 @@ async fn main() {
 
     let total_nodes: u64 = 1 << args.factor;
 
-    let config = Some(
-        serde_json::json!({"interval" : interval, "nodes": total_nodes, "inputs": total_nodes, "msgs": args.msgs}),
-    );
+    let config = match args.kind {
+        FanKind::FanIn => Some(
+            serde_json::json!({"interval" : interval, "nodes": total_nodes, "inputs": total_nodes, "msgs": args.msgs, "mode": 1, "multi":true}),
+        ),
+        FanKind::FanOut | FanKind::FanOutFanIn => Some(
+            serde_json::json!({"interval" : interval, "nodes": total_nodes, "inputs": total_nodes, "msgs": args.msgs, "mode": 2, "multi":true}),
+        ),
+    };
 
     // Creating the descriptor
 
@@ -107,7 +111,7 @@ async fn main() {
         id: "source".into(),
         period: None,
         output: PortDescriptor {
-            port_id: PORT.into(),
+            port_id: LAT_PORT.into(),
             port_type: "latency".into(),
         },
         uri: Some(String::from(PING_SRC_URI)),
@@ -120,15 +124,22 @@ async fn main() {
 
     match args.kind {
         FanKind::FanIn => {
+            let mut id_hm: HashMap<String, Value> = HashMap::new();
+            id_hm.insert("id".to_string(), 0.into());
+            let sink_config = Some(zenoh_flow_perf::operators::dict_merge(
+                &config.clone().unwrap(),
+                &id_hm,
+            ));
+
             // creating sink
             let sink_descriptor = SinkDescriptor {
                 id: "sink".into(),
                 input: PortDescriptor {
-                    port_id: PORT.into(),
+                    port_id: LAT_PORT.into(),
                     port_type: "latency".into(),
                 },
                 uri: Some(String::from(PONG_SNK_URI)),
-                configuration: config.clone(),
+                configuration: sink_config,
                 runtime: None,
             };
             dfd.sinks.push(sink_descriptor);
@@ -144,11 +155,11 @@ async fn main() {
                 let op_descriptor = OperatorDescriptor {
                     id: format!("op-{i}").into(),
                     inputs: vec![PortDescriptor {
-                        port_id: PORT.into(),
+                        port_id: LAT_PORT.into(),
                         port_type: "latency".into(),
                     }],
                     outputs: vec![PortDescriptor {
-                        port_id: PORT.into(),
+                        port_id: LAT_PORT.into(),
                         port_type: "latency".into(),
                     }],
                     uri: Some(String::from(NOOP_URI)),
@@ -163,7 +174,7 @@ async fn main() {
             let mut inputs = vec![];
             for i in 0..total_nodes {
                 inputs.push(PortDescriptor {
-                    port_id: format!("{}{}", PORT, i).into(),
+                    port_id: format!("{}{}", LAT_PORT, i).into(),
                     port_type: "latency".into(),
                 });
             }
@@ -173,7 +184,7 @@ async fn main() {
                 id: format!("op-last").into(),
                 inputs,
                 outputs: vec![PortDescriptor {
-                    port_id: PORT.into(),
+                    port_id: LAT_PORT.into(),
                     port_type: "latency".into(),
                 }],
                 uri: Some(String::from(LASTOP_URI)),
@@ -191,11 +202,11 @@ async fn main() {
             let op_last_snk_link = LinkDescriptor {
                 from: OutputDescriptor {
                     node: "op-last".into(),
-                    output: PORT.into(),
+                    output: LAT_PORT.into(),
                 },
                 to: InputDescriptor {
                     node: "sink".into(),
-                    input: PORT.into(),
+                    input: LAT_PORT.into(),
                 },
                 size: None,
                 queueing_policy: None,
@@ -208,11 +219,11 @@ async fn main() {
                 let src_op_link = LinkDescriptor {
                     from: OutputDescriptor {
                         node: "source".into(),
-                        output: PORT.into(),
+                        output: LAT_PORT.into(),
                     },
                     to: InputDescriptor {
                         node: format!("op-{i}").into(),
-                        input: PORT.into(),
+                        input: LAT_PORT.into(),
                     },
                     size: None,
                     queueing_policy: None,
@@ -222,11 +233,11 @@ async fn main() {
                 let op_op_link = LinkDescriptor {
                     from: OutputDescriptor {
                         node: format!("op-{i}").into(),
-                        output: PORT.into(),
+                        output: LAT_PORT.into(),
                     },
                     to: InputDescriptor {
                         node: "op-last".into(),
-                        input: format!("{}{}", PORT, i).into(),
+                        input: format!("{}{}", LAT_PORT, i).into(),
                     },
                     size: None,
                     queueing_policy: None,
@@ -243,11 +254,11 @@ async fn main() {
                 let op_descriptor = OperatorDescriptor {
                     id: format!("op-{i}").into(),
                     inputs: vec![PortDescriptor {
-                        port_id: PORT.into(),
+                        port_id: LAT_PORT.into(),
                         port_type: "latency".into(),
                     }],
                     outputs: vec![PortDescriptor {
-                        port_id: PORT.into(),
+                        port_id: LAT_PORT.into(),
                         port_type: "latency".into(),
                     }],
                     uri: Some(String::from(NOOP_URI)),
@@ -260,14 +271,15 @@ async fn main() {
 
             // creating sinks
             for i in 0..total_nodes {
-                let mut id_hm = HashMap::new();
-                id_hm.insert("id".to_string(),format!("{i}"));
-                let sink_config = zenoh_flow_perf::operators::dict_merge(&config.clone().unwrap(), &id_hm);
+                let mut id_hm: HashMap<String, Value> = HashMap::new();
+                id_hm.insert("id".to_string(), i.into());
+                let sink_config =
+                    zenoh_flow_perf::operators::dict_merge(&config.clone().unwrap(), &id_hm);
 
                 let sink_descriptor = SinkDescriptor {
                     id: format!("sink-{i}").into(),
                     input: PortDescriptor {
-                        port_id: PORT.into(),
+                        port_id: LAT_PORT.into(),
                         port_type: "latency".into(),
                     },
                     uri: Some(String::from(PONG_SNK_URI)),
@@ -291,11 +303,11 @@ async fn main() {
                 let src_op_link = LinkDescriptor {
                     from: OutputDescriptor {
                         node: "source".into(),
-                        output: PORT.into(),
+                        output: LAT_PORT.into(),
                     },
                     to: InputDescriptor {
                         node: format!("op-{i}").into(),
-                        input: PORT.into(),
+                        input: LAT_PORT.into(),
                     },
                     size: None,
                     queueing_policy: None,
@@ -305,11 +317,11 @@ async fn main() {
                 let op_snk_link = LinkDescriptor {
                     from: OutputDescriptor {
                         node: format!("op-{i}").into(),
-                        output: PORT.into(),
+                        output: LAT_PORT.into(),
                     },
                     to: InputDescriptor {
                         node: format!("sink-{i}").into(),
-                        input: PORT.into(),
+                        input: LAT_PORT.into(),
                     },
                     size: None,
                     queueing_policy: None,

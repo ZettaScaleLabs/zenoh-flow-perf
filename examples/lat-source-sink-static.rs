@@ -61,8 +61,7 @@ async fn main() {
 
     // let operator = Arc::new(NoOp {});
 
-    let config =
-        serde_json::json!({"interval" : interval, "pipeline":args.pipeline, "msgs": args.msgs});
+    let config = serde_json::json!({"interval" : interval, "pipeline":args.pipeline, "msgs": args.msgs, "multi":false});
     let config = Some(config);
 
     zf_graph

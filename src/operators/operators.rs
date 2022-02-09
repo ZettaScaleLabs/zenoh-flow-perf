@@ -65,6 +65,7 @@ struct LatOpState {
     pipeline: u64,
     interval: f64,
     msgs: u64,
+    layer: String,
 }
 
 #[derive(Debug)]
@@ -89,6 +90,7 @@ impl Operator for NoOpPrint {
         let results: HashMap<PortId, Data> = HashMap::new();
 
         let real_state = state.try_get::<LatOpState>()?;
+        let layer = &real_state.layer;
         let _ = real_state.interval;
 
         let data = inputs
@@ -103,7 +105,7 @@ impl Operator for NoOpPrint {
         let msgs = real_state.msgs;
         let pipeline = real_state.pipeline;
         // layer,scenario name,test kind, test name, payload size, msg/s, pipeline size, latency, unit
-        println!("zf-source-op,scenario,latency,pipeline,{msgs},{pipeline},{elapsed},us");
+        println!("{layer},scenario,latency,pipeline,{msgs},{pipeline},{elapsed},us");
 
         Ok(results)
     }
@@ -136,10 +138,21 @@ impl Node for NoOpPrint {
             None => 1u64,
         };
 
+        let multi = match configuration {
+            Some(conf) => conf["multi"].as_bool().unwrap(),
+            None => false,
+        };
+
+        let layer = match multi {
+            true => "zf-src-op-multi".to_string(),
+            false => "zf-src-op".to_string(),
+        };
+
         Ok(State::from(LatOpState {
             interval,
             pipeline,
             msgs,
+            layer,
         }))
     }
 
@@ -261,7 +274,7 @@ impl Node for IRNoOp {
             None => 1,
         };
 
-        Ok(State::from(IROpState { _inputs : inputs }))
+        Ok(State::from(IROpState { _inputs: inputs }))
     }
 
     fn finalize(&self, _state: &mut State) -> ZFResult<()> {

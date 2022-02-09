@@ -89,6 +89,7 @@ struct PongSinkState {
     session: Arc<zenoh::Session>,
     expr: ExprId,
     data: Vec<u8>,
+    layer: String,
 }
 
 #[async_trait]
@@ -100,6 +101,7 @@ impl Sink for PongSink {
         mut input: zenoh_flow::runtime::message::DataMessage,
     ) -> zenoh_flow::ZFResult<()> {
         let real_state = state.try_get::<PongSinkState>()?;
+        let layer = &real_state.layer;
         let _ = real_state.interval;
 
         let data = input.get_inner_data().try_get::<Latency>()?;
@@ -110,7 +112,7 @@ impl Sink for PongSink {
         let msgs = real_state.msgs;
         let pipeline = real_state.pipeline;
         // layer,scenario name,test kind, test name, payload size, msg/s, pipeline size, latency, unit
-        println!("zenoh-flow,scenario,latency,pipeline,{msgs},{pipeline},{elapsed},us");
+        println!("{layer},scenario,latency,pipeline,{msgs},{pipeline},{elapsed},us");
 
         // pong back
         real_state
@@ -140,6 +142,16 @@ impl Node for PongSink {
             None => 1u64,
         };
 
+        let multi = match configuration {
+            Some(conf) => conf["multi"].as_bool().unwrap(),
+            None => false,
+        };
+
+        let layer = match multi {
+            true => "zenoh-flow-multi".to_string(),
+            false => "zenoh-flow".to_string(),
+        };
+
         let mut config = zenoh::config::Config::default();
         config
             .set_mode(Some(zenoh::config::whatami::WhatAmI::Peer))
@@ -158,6 +170,7 @@ impl Node for PongSink {
             session,
             expr,
             data: vec![],
+            layer,
         }))
     }
 
@@ -200,6 +213,16 @@ impl Node for ThrSink {
             None => 8usize,
         };
 
+        let multi = match configuration {
+            Some(conf) => conf["multi"].as_bool().unwrap(),
+            None => false,
+        };
+
+        let layer = match multi {
+            true => "zenoh-flow-multi".to_string(),
+            false => "zenoh-flow".to_string(),
+        };
+
         let accumulator = Arc::new(AtomicUsize::new(0usize));
 
         let loop_accumulator = Arc::clone(&accumulator);
@@ -216,7 +239,8 @@ impl Node for ThrSink {
                 if c > 0 {
                     let interval = 1_000_000.0 / elapsed;
                     println!(
-                        "zenoh-flow-static,same-runtime,throughput,{},{},{}",
+                        "{},same-runtime,throughput,{},{},{}",
+                        layer,
                         "test-name",
                         loop_payload_size,
                         (c as f64 / interval).floor() as usize
@@ -255,6 +279,8 @@ struct ScalPongSinkState {
     session: Arc<zenoh::Session>,
     expr: ExprId,
     data: Vec<u8>,
+    diff: bool,
+    layer: String,
 }
 
 #[async_trait]
@@ -265,16 +291,23 @@ impl Sink for ScalPongSink {
         state: &mut State,
         mut input: zenoh_flow::runtime::message::DataMessage,
     ) -> zenoh_flow::ZFResult<()> {
+        let now = get_epoch_us();
+
         let real_state = state.try_get::<ScalPongSinkState>()?;
+
         let _ = real_state.interval;
 
         let data = input.get_inner_data().try_get::<Latency>()?;
 
-        let elapsed = data.ts;
+        let layer = &real_state.layer;
+        let elapsed = match real_state.diff {
+            true => now - data.ts,
+            false => data.ts,
+        };
         let msgs = real_state.msgs;
         let pipeline = real_state.nodes;
         // layer,scenario name,test kind, test name, payload size, msg/s, pipeline size, latency, unit
-        println!("zenoh-flow-multi,scenario,latency,pipeline,{msgs},{pipeline},{elapsed},us");
+        println!("{layer},scalability,latency,pipeline,{msgs},{pipeline},{elapsed},us");
 
         // pong back
         real_state
@@ -310,6 +343,26 @@ impl Node for ScalPongSink {
             None => 0u64,
         };
 
+        let mode = match configuration {
+            Some(conf) => conf["mode"].as_u64().unwrap(),
+            None => 1u64,
+        };
+
+        let multi = match configuration {
+            Some(conf) => conf["multi"].as_bool().unwrap(),
+            None => false,
+        };
+
+        let layer = match multi {
+            true => "zenoh-flow-multi".to_string(),
+            false => "zenoh-flow".to_string(),
+        };
+
+        let diff = match mode {
+            1 => false,
+            _ => true,
+        };
+
         let mut config = zenoh::config::Config::default();
         config
             .set_mode(Some(zenoh::config::whatami::WhatAmI::Peer))
@@ -322,7 +375,7 @@ impl Node for ScalPongSink {
         let session = zenoh::open(config).wait().unwrap().into_arc();
 
         let expr = session
-            .declare_expr(format!("/test/latency/zf/pong/{node_id})"))
+            .declare_expr(format!("/test/latency/zf/pong/{node_id}"))
             .wait()
             .unwrap();
 
@@ -333,6 +386,8 @@ impl Node for ScalPongSink {
             session,
             expr,
             data: vec![],
+            diff,
+            layer,
         }))
     }
 

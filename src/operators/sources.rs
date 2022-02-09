@@ -155,8 +155,6 @@ impl Node for ThrSource {
     }
 }
 
-
-
 // Scalability Ping SOURCE
 
 #[derive(Debug)]
@@ -189,7 +187,6 @@ impl Source for ScalPingSource {
             for sub in &real_state.subs {
                 let _ = sub.recv();
             }
-
         } else {
             real_state.first = false;
         }
@@ -212,6 +209,11 @@ impl Node for ScalPingSource {
             None => 1u64,
         };
 
+        let mode = match configuration {
+            Some(conf) => conf["mode"].as_u64().unwrap(),
+            None => 1u64,
+        };
+
         let mut config = zenoh::config::Config::default();
         config
             .set_mode(Some(zenoh::config::whatami::WhatAmI::Peer))
@@ -219,22 +221,30 @@ impl Node for ScalPingSource {
         let session = zenoh::open(config).wait().unwrap().into_arc();
 
         let mut key_exp_vec = vec![];
+        let mut subs = vec![];
+        if mode == 2 {
+            // 2 means fan out, 1 means fan in
 
-        for i in 0..nodes {
+            for i in 0..nodes {
+                let key_expr_pong = session
+                    .declare_expr(format!("/test/latency/zf/pong/{i}"))
+                    .wait()
+                    .unwrap();
+                key_exp_vec.push(key_expr_pong);
+            }
+
+            for kx in &key_exp_vec {
+                let sub = session.subscribe(kx).wait().unwrap();
+                subs.push(sub);
+            }
+        } else {
             let key_expr_pong = session
-                .declare_expr(format!("/test/latency/zf/pong/{i}"))
+                .declare_expr(format!("/test/latency/zf/pong/0"))
                 .wait()
                 .unwrap();
-            key_exp_vec.push(key_expr_pong);
-        }
-        let mut subs = vec![];
-        for kx in &key_exp_vec {
-            let sub = session.subscribe(kx).wait().unwrap();
+            let sub = session.subscribe(key_expr_pong).wait().unwrap();
             subs.push(sub);
         }
-
-
-
 
         Ok(State::from(ScalPingSourceState::new(interval, subs)))
     }

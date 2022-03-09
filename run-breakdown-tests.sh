@@ -274,8 +274,9 @@ while getopts "hflsdzcr" arg; do
       LOG_FILE="$OUT_DIR/ros-lat-$TS.csv"
       echo "framework,scenario,test,pipeline,payload,rate,value,unit" > $LOG_FILE
       export ROS_LOCALHOST_ONLY=1
-      source /opt/ros/foxy/setup.bash
-      source $ROS2_COMPARISON_DIR/install/setup.bash
+      source /opt/ros/noetic/setup.bash
+
+      roscore -p 11311 2>&1 &
 
       s=$INITIAL_MSGS
       while [ $s -le $FINAL_MSGS ]
@@ -294,6 +295,7 @@ while getopts "hflsdzcr" arg; do
          ps -ax | grep compute_node | awk {'print $1'} | xargs kill -9 > /dev/null  2>&1
          ps -ax | grep receiver_node | awk {'print $1'} | xargs kill -9 > /dev/null  2>&1
          ps -ax | grep sender_node | awk {'print $1'} | xargs kill -9 > /dev/null  2>&1
+         ps -ax | grep roscore | awk {'print $1'} | xargs kill -9 > /dev/null  2>&1
 
 
          plog "[ DONE ] ROS for msg/s $s w/ Ping"
@@ -301,6 +303,7 @@ while getopts "hflsdzcr" arg; do
          echo "Still running compute_node: $(ps -A | grep compute_node | wc -l) - This should be 0"
          echo "Still running receiver_node: $(ps -A | grep receiver_node | wc -l) - This should be 0"
          echo "Still running sender_node: $(ps -A | grep sender_node | wc -l) - This should be 0"
+         echo "Still running roscore: $(ps -A | grep compute_node | wc -l) - This should be 0"
          s=$(($s * 10))
 
       done

@@ -10,7 +10,7 @@ pub async fn runtime(name: String, descriptor_file: String) {
 
     let yaml_df = read_to_string(descriptor_file).unwrap();
 
-    let loader_config = LoaderConfig { extensions: vec![] };
+    let loader_config = LoaderConfig::new();
 
     let session = Arc::new(zenoh::open(zenoh::config::Config::default()).await.unwrap());
     let hlc = async_std::sync::Arc::new(uhlc::HLC::default());

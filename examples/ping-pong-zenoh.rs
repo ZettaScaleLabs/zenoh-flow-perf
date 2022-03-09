@@ -21,6 +21,7 @@ use zenoh::prelude::*;
 use zenoh::publication::CongestionControl;
 use zenoh_flow::{Data, Message};
 use zenoh_flow_perf::{get_epoch_us, Latency};
+use zenoh::net::protocol::io::SplitBuffer;
 
 static DEFAULT_PIPELINE: &str = "1";
 static DEFAULT_MSGS: &str = "1";
@@ -83,8 +84,9 @@ async fn pong(session: zenoh::Session, msgs: u64, pipeline: u64, udp: bool) {
                 let data = data_msg.get_inner_data().try_get::<Latency>().unwrap();
                 let elapsed = now - data.ts;
 
-                // layer,scenario name,test kind, test name, payload size, msg/s, pipeline size, latency, unit
-                println!("{layer},scenario,latency,pipeline,{msgs},{pipeline},{elapsed},us");
+                // framework,scenario,test,pipeline,payload,rate,value,unit
+                println!("zenoh,multi,latency,{pipeline},8,{msgs},{msgs},{elapsed},us")
+
                 io::stdout().flush().unwrap();
 
                 session
@@ -115,12 +117,14 @@ async fn main() {
     if args.udp {
         let locator = format!("udp/127.0.0.1:{}", rng.gen_range(8000..65000));
         config
-            .set_listeners(vec![locator.parse().unwrap()])
+            .listen
+            .set_endpoints(vec![locator.parse().unwrap()])
             .unwrap();
     } else {
         let locator = format!("tcp/127.0.0.1:{}", rng.gen_range(8000..65000));
         config
-            .set_listeners(vec![locator.parse().unwrap()])
+            .listen
+            .set_endpoints(vec![locator.parse().unwrap()])
             .unwrap();
     }
 

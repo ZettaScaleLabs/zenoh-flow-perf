@@ -119,7 +119,10 @@ void ping_cb(dds_entity_t reader, void *args) {
 
     rmsg = (Evaluation_Latency*) samples[0];
     auto latency = ts - rmsg->ts;
-    std::cout << "cyclonedds,scenario,latency,pipeline," << writer_struct->msgs << ",1," << latency << ",us" << std::endl << std::flush;
+
+    // framework,scenario,test,pipeline,payload,rate,value,unit
+    std::cout << "cyclonedds,multi,latency,1,8," << writer_struct->msgs << "," << writer_struct->msgs << "," << latency << ",us" << std::endl << std::flush;
+
     msg.ts = 0;
     rc = dds_write(writer_struct->writer, &msg);
     if (rc < 0 ) DDS_FATAL("dds_read: %s\n", dds_strretcode(-rc));

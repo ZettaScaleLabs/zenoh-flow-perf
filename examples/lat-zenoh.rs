@@ -19,6 +19,7 @@ use structopt::StructOpt;
 use zenoh::publication::CongestionControl;
 use zenoh_flow::{Data, Message};
 use zenoh_flow_perf::{get_epoch_us, Latency};
+use zenoh::net::protocol::io::SplitBuffer;
 
 static DEFAULT_PIPELINE: &str = "1";
 static DEFAULT_MSGS: &str = "1";
@@ -108,7 +109,8 @@ async fn main() {
     if args.udp {
         let locator = format!("udp/127.0.0.1:{}", rng.gen_range(8000..65000));
         config
-            .set_listeners(vec![locator.parse().unwrap()])
+            .listen
+            .set_endpoints(vec![locator.parse().unwrap()])
             .unwrap();
     }
 

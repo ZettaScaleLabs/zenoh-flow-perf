@@ -1,0 +1,8 @@
+prefix=/home/ato/Workspace/zenoh-flow-perf/comparison/ros/eval-ws/install
+
+Name: eval_interfaces
+Description: Description of eval_interfaces
+Version: 0.0.1
+Cflags: -I${prefix}/include
+Libs: -L${prefix}/lib 
+Requires: message_runtime

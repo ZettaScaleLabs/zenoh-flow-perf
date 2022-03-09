@@ -4,8 +4,8 @@
   <name>compute</name>
   <version>0.0.0</version>
   <description>TODO: Package description</description>
-  <maintainer email="luca@todo.todo">luca</maintainer>
-  <license>TODO: License declaration</license>
+  <maintainer email="zenoh@zettascale.tech">Zenoh Team</maintainer>
+  <license>Apache 2.0</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 

@@ -6,7 +6,7 @@ TS=`eval date "+%F-%T"`
    echo "[$TS]: $1"
 }
 
-usage() { printf "Usage: $0 \n\t-f flume\n\t-l link\n\t-s static\n\t-d dynamic\n\t-z zenoh\n\t-c CycloneDDS\n\t-r ROS2\n" 1>&2; exit 1; }
+usage() { printf "Usage: $0 \n\t-f flume\n\t-l link\n\t-s static\n\t-d dynamic\n\t-z zenoh\n\t-c CycloneDDS\n\t-r ROS2\n\t-R ROS\n" 1>&2; exit 1; }
 
 
 
@@ -28,6 +28,8 @@ FINAL_MSGS=1000000
 CHAIN_LENGTH=1
 BIN_DIR="./target/release/examples"
 
+ROS_BIN_DIR="./comparison/ros/eval-ws/build"
+
 WD=$(pwd)
 
 LAT_FLUME="lat-flume"
@@ -45,11 +47,14 @@ PP_STATIC="ping-pong-static"
 CDDS_COMPARISON_DIR="./comparison/cyclonedds/ping-pong/build"
 ROS2_COMPARISON_DIR="./comparison/ros2/eval-ws"
 
-ROS_SRC="ros2 run sender sender_ros"
-ROS_OP="ros2 run compute compute_ros"
-ROS_SINK="ros2 run receiver receiver_ros"
+ROS2_SRC="ros2 run sender sender_ros"
+ROS2_OP="ros2 run compute compute_ros"
+ROS2_SINK="ros2 run receiver receiver_ros"
 PP_CDDS="ping-pong-cyclone"
 
+ROS_SRC="/sender/sender_node"
+ROS_OP="/compute/compute_node"
+ROS_SINK="/receiver/receiver_node"
 
 OUT_DIR="${OUT_DIR:-breakdown-logs}"
 
@@ -69,7 +74,7 @@ while getopts "hflsdzcr" arg; do
 
       plog "[ START ] baseline Flume Latency test"
       LOG_FILE="$OUT_DIR/flume-$TS.csv"
-      echo "layer,scenario,test,name,messages,pipeline,latency,unit" > $LOG_FILE
+      echo "framework,scenario,test,pipeline,payload,rate,value,unit" > $LOG_FILE
       s=$INITIAL_MSGS
       while [ $s -le $FINAL_MSGS ]
       do
@@ -92,7 +97,7 @@ while getopts "hflsdzcr" arg; do
 
       plog "[ START ] baseline ZF Link Latency test"
       LOG_FILE="$OUT_DIR/zf-link-$TS.csv"
-      echo "layer,scenario,test,name,messages,pipeline,latency,unit" > $LOG_FILE
+      echo "framework,scenario,test,pipeline,payload,rate,value,unit" > $LOG_FILE
       s=$INITIAL_MSGS
       while [ $s -le $FINAL_MSGS ]
       do
@@ -115,7 +120,7 @@ while getopts "hflsdzcr" arg; do
 
       plog "[ START ] Zenoh Flow Source->Operator->Sink Static Latency w/ Ping test"
       LOG_FILE="$OUT_DIR/zf-src-op-sink-static-pp-$TS.csv"
-      echo "layer,scenario,test,name,messages,pipeline,latency,unit" > $LOG_FILE
+      echo "framework,scenario,test,pipeline,payload,rate,value,unit" > $LOG_FILE
       s=$INITIAL_MSGS
       while [ $s -le $FINAL_MSGS ]
       do
@@ -141,7 +146,7 @@ while getopts "hflsdzcr" arg; do
 
       plog "[ START ] Zenoh Flow Source->Operator->Sink Dynamic Latency w/ Ping test"
       LOG_FILE="$OUT_DIR/zf-src-op-sink-dynamic-pp-$TS.csv"
-      echo "layer,scenario,test,name,messages,pipeline,latency,unit" > $LOG_FILE
+      echo "framework,scenario,test,pipeline,payload,rate,value,unit" > $LOG_FILE
       s=$INITIAL_MSGS
       while [ $s -le $FINAL_MSGS ]
       do
@@ -174,7 +179,7 @@ while getopts "hflsdzcr" arg; do
 
       plog "[ START ] baseline Zenoh Latency test"
       LOG_FILE="$OUT_DIR/zenoh-pp-$TS.csv"
-      echo "layer,scenario,test,name,messages,pipeline,latency,unit" > $LOG_FILE
+      echo "framework,scenario,test,pipeline,payload,rate,value,unit" > $LOG_FILE
       s=$INITIAL_MSGS
       while [ $s -le $FINAL_MSGS ]
       do
@@ -201,7 +206,7 @@ while getopts "hflsdzcr" arg; do
 
       plog "[ START ] baseline CycloneDDS Latency test"
       LOG_FILE="$OUT_DIR/cyclone-lat-$TS.csv"
-      echo "layer,scenario,test,name,messages,pipeline,latency,unit" > $LOG_FILE
+      echo "framework,scenario,test,pipeline,payload,rate,value,unit" > $LOG_FILE
       s=$INITIAL_MSGS
       while [ $s -le $FINAL_MSGS ]
       do
@@ -228,7 +233,7 @@ while getopts "hflsdzcr" arg; do
 
       plog "[ START ] ROS2 Latency test"
       LOG_FILE="$OUT_DIR/ros2-lat-$TS.csv"
-      echo "layer,scenario,test,name,messages,pipeline,latency,unit" > $LOG_FILE
+      echo "framework,scenario,test,pipeline,payload,rate,value,unit" > $LOG_FILE
       export ROS_LOCALHOST_ONLY=1
       source /opt/ros/foxy/setup.bash
       source $ROS2_COMPARISON_DIR/install/setup.bash
@@ -239,13 +244,13 @@ while getopts "hflsdzcr" arg; do
          plog "[ RUN ] ROS2 for msg/s $s"
 
 
-         nohup taskset -c 0,1 $ROS_SINK $s 1 "out_1" >> $LOG_FILE 2> /dev/null &
+         nohup taskset -c 0,1 $ROS2_SINK $s 1 "out_1" >> $LOG_FILE 2> /dev/null &
          sleep 3
-         nohup taskset -c 2,3 $ROS_OP "out_0" "out_1" > /dev/null 2>&1 &
+         nohup taskset -c 2,3 $ROS2_OP "out_0" "out_1" > /dev/null 2>&1 &
 
          sleep 3
 
-         timeout $DURATION taskset -c 4,5 $ROS_SRC $s #> /dev/null 2>&1
+         timeout $DURATION taskset -c 4,5 $ROS2_SRC $s #> /dev/null 2>&1
 
          ps -ax | grep compute_ros | awk {'print $1'} | xargs kill -9 > /dev/null  2>&1
          ps -ax | grep receiver_ros | awk {'print $1'} | xargs kill -9 > /dev/null  2>&1
@@ -262,6 +267,45 @@ while getopts "hflsdzcr" arg; do
       done
       plog "[ END ] ROS2 Latency test"
       ;;
+   R)
+      # ROS2
+
+      plog "[ START ] ROS Latency test"
+      LOG_FILE="$OUT_DIR/ros-lat-$TS.csv"
+      echo "framework,scenario,test,pipeline,payload,rate,value,unit" > $LOG_FILE
+      export ROS_LOCALHOST_ONLY=1
+      source /opt/ros/foxy/setup.bash
+      source $ROS2_COMPARISON_DIR/install/setup.bash
+
+      s=$INITIAL_MSGS
+      while [ $s -le $FINAL_MSGS ]
+      do
+         plog "[ RUN ] ROS for msg/s $s"
+
+
+         nohup taskset -c 0,1 $ROS_BIN_DIR$ROS_SINK $s 1 "out_1" >> $LOG_FILE 2> /dev/null &
+         sleep 3
+         nohup taskset -c 2,3 $ROS_BIN_DIR$ROS2_OP "out_0" "out_1" > /dev/null 2>&1 &
+
+         sleep 3
+
+         timeout $DURATION taskset -c 4,5 $ROS_BIN_DIR$ROS_SRC $s #> /dev/null 2>&1
+
+         ps -ax | grep compute_node | awk {'print $1'} | xargs kill -9 > /dev/null  2>&1
+         ps -ax | grep receiver_node | awk {'print $1'} | xargs kill -9 > /dev/null  2>&1
+         ps -ax | grep sender_node | awk {'print $1'} | xargs kill -9 > /dev/null  2>&1
+
+
+         plog "[ DONE ] ROS for msg/s $s w/ Ping"
+         sleep 1
+         echo "Still running compute_node: $(ps -A | grep compute_node | wc -l) - This should be 0"
+         echo "Still running receiver_node: $(ps -A | grep receiver_node | wc -l) - This should be 0"
+         echo "Still running sender_node: $(ps -A | grep sender_node | wc -l) - This should be 0"
+         s=$(($s * 10))
+
+      done
+      plog "[ END ] ROS Latency test"
+      ;;
    *)
       usage
       ;;
@@ -275,7 +319,7 @@ plog "Bye!"
 
 # plog "[ START ] Zenoh Flow Source->Sink Static Latency test"
 # LOG_FILE="$OUT_DIR/zf-src-snk-static-$TS.csv"
-# echo "layer,scenario,test,name,messages,pipeline,latency,unit" > $LOG_FILE
+# echo "framework,scenario,test,pipeline,payload,rate,value,unit" > $LOG_FILE
 # s=$INITIAL_MSGS
 # while [ $s -le $FINAL_MSGS ]
 # do
@@ -297,7 +341,7 @@ plog "Bye!"
 
 # plog "[ START ] Zenoh Flow Source->Operator Static Latency test"
 # LOG_FILE="$OUT_DIR/zf-src-op-static-$TS.csv"
-# echo "layer,scenario,test,name,messages,pipeline,latency,unit" > $LOG_FILE
+# echo "framework,scenario,test,pipeline,payload,rate,value,unit" > $LOG_FILE
 # s=$INITIAL_MSGS
 # while [ $s -le $FINAL_MSGS ]
 # do
@@ -320,7 +364,7 @@ plog "Bye!"
 
 # plog "[ START ] Zenoh Flow Source->Sink Dynamic Latency test"
 # LOG_FILE="$OUT_DIR/zf-src-snk-dynamic-$TS.csv"
-# echo "layer,scenario,test,name,messages,pipeline,latency,unit" > $LOG_FILE
+# echo "framework,scenario,test,pipeline,payload,rate,value,unit" > $LOG_FILE
 # s=$INITIAL_MSGS
 # while [ $s -le $FINAL_MSGS ]
 # do
@@ -350,7 +394,7 @@ plog "Bye!"
 
 # plog "[ START ] Zenoh Flow Source->Operator Dynamic Latency test"
 # LOG_FILE="$OUT_DIR/zf-src-op-dynamic-$TS.csv"
-# echo "layer,scenario,test,name,messages,pipeline,latency,unit" > $LOG_FILE
+# echo "framework,scenario,test,pipeline,payload,rate,value,unit" > $LOG_FILE
 # s=$INITIAL_MSGS
 # while [ $s -le $FINAL_MSGS ]
 # do
@@ -381,7 +425,7 @@ plog "Bye!"
 
 # plog "[ START ] Zenoh Flow Source->Operator->Sink Static Latency test"
 # LOG_FILE="$OUT_DIR/zf-src-op-sink-static-$TS.csv"
-# echo "layer,scenario,test,name,messages,pipeline,latency,unit" > $LOG_FILE
+# echo "framework,scenario,test,pipeline,payload,rate,value,unit" > $LOG_FILE
 # s=$INITIAL_MSGS
 # while [ $s -le $FINAL_MSGS ]
 # do
@@ -405,7 +449,7 @@ plog "Bye!"
 
 # # plog "[ START ] Zenoh Flow Source->Operator->Sink Dynamic Latency test"
 # # LOG_FILE="$OUT_DIR/zf-src-op-sink-dynamic-$TS.csv"
-# # echo "layer,scenario,test,name,messages,pipeline,latency,unit" > $LOG_FILE
+# # echo "framework,scenario,test,pipeline,payload,rate,value,unit" > $LOG_FILE
 # # s=$INITIAL_MSGS
 # # while [ $s -le $FINAL_MSGS ]
 # # do
@@ -439,7 +483,7 @@ plog "Bye!"
 
 # plog "[ START ] baseline Zenoh Latency test"
 # LOG_FILE="$OUT_DIR/zenoh-$TS.csv"
-# echo "layer,scenario,test,name,messages,pipeline,latency,unit" > $LOG_FILE
+# echo "framework,scenario,test,pipeline,payload,rate,value,unit" > $LOG_FILE
 # s=$INITIAL_MSGS
 # while [ $s -le $FINAL_MSGS ]
 # do
@@ -463,7 +507,7 @@ plog "Bye!"
 
 # plog "[ START ] baseline Zenoh UDP Latency test"
 # LOG_FILE="$OUT_DIR/zenoh-udp-$TS.csv"
-# echo "layer,scenario,test,name,messages,pipeline,latency,unit" > $LOG_FILE
+# echo "framework,scenario,test,pipeline,payload,rate,value,unit" > $LOG_FILE
 # s=$INITIAL_MSGS
 # while [ $s -le $FINAL_MSGS ]
 # do
@@ -488,7 +532,7 @@ plog "Bye!"
 
 # plog "[ START ] baseline Zenoh UDP Latency test"
 # LOG_FILE="$OUT_DIR/zenoh-udp-pp-$TS.csv"
-# echo "layer,scenario,test,name,messages,pipeline,latency,unit" > $LOG_FILE
+# echo "framework,scenario,test,pipeline,payload,rate,value,unit" > $LOG_FILE
 # s=$INITIAL_MSGS
 # while [ $s -le $FINAL_MSGS ]
 # do

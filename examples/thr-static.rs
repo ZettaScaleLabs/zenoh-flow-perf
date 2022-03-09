@@ -45,7 +45,7 @@ async fn main() {
     let ctx = RuntimeContext {
         session,
         hlc,
-        loader: Arc::new(Loader::new(LoaderConfig { extensions: vec![] })),
+        loader: Arc::new(Loader::new(LoaderConfig::new())),
         runtime_name: format!("thr-runtime-{}", rt_uuid).into(),
         runtime_uuid: rt_uuid,
     };
@@ -57,7 +57,7 @@ async fn main() {
     let sink = Arc::new(ThrSink {});
     let operator = Arc::new(ThrNoOp {});
 
-    let config = serde_json::json!({"payload_size" : args.size});
+    let config = serde_json::json!({"payload_size" : args.size, "multi": false});
     let config = Some(config);
 
     zf_graph

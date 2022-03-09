@@ -39,8 +39,15 @@ impl Sink for LatSink {
         let elapsed = now - data.ts;
         let msgs = real_state.msgs;
         let pipeline = real_state.pipeline;
+
+        // layer,scenario,test,name,messages,pipeline,latency,x,unit
+        // println!("zenoh-flow,single,latency,{msgs},{pipeline},{elapsed},8,us");
+
+        // framework, scenario, test, pipeline, payload, rate, value, unit
+        println!("zenoh-flow,single,latency,{pipeline},8,{msgs},{elapsed},us");
+
         // layer,scenario name,test kind, test name, payload size, msg/s, pipeline size, latency, unit
-        println!("zenoh-flow,scenario,latency,pipeline,{msgs},{pipeline},{elapsed},us");
+        // println!("zenoh-flow,scenario,latency,pipeline,{msgs},{pipeline},{elapsed},us");
 
         Ok(())
     }
@@ -111,8 +118,16 @@ impl Sink for PongSink {
         let elapsed = now - data.ts;
         let msgs = real_state.msgs;
         let pipeline = real_state.pipeline;
+
+
+        // layer,scenario,test,name,messages,pipeline,latency,time,unit
+        // println!("zenoh-flow,{layer},latency,zenoh-flow-latency,{msgs},{pipeline},{elapsed},8,us");
+
+        // framework, scenario, test, pipeline, payload, rate, value, unit
+        println!("zenoh-flow,{layer},latency,{pipeline},8,{msgs},{elapsed},us");
+
         // layer,scenario name,test kind, test name, payload size, msg/s, pipeline size, latency, unit
-        println!("{layer},scenario,latency,pipeline,{msgs},{pipeline},{elapsed},us");
+        // println!("{layer},scenario,latency,pipeline,{msgs},{pipeline},{elapsed},us");
 
         // pong back
         real_state
@@ -148,8 +163,8 @@ impl Node for PongSink {
         };
 
         let layer = match multi {
-            true => "zenoh-flow-multi".to_string(),
-            false => "zenoh-flow".to_string(),
+            true => "multi".to_string(),
+            false => "single".to_string(),
         };
 
         let mut config = zenoh::config::Config::default();
@@ -218,9 +233,9 @@ impl Node for ThrSink {
             None => false,
         };
 
-        let layer = match multi {
-            true => "zenoh-flow-multi".to_string(),
-            false => "zenoh-flow".to_string(),
+        let scenario = match multi {
+            true => "multi".to_string(),
+            false => "single".to_string(),
         };
 
         let accumulator = Arc::new(AtomicUsize::new(0usize));
@@ -229,7 +244,6 @@ impl Node for ThrSink {
         let loop_payload_size = payload_size.clone();
 
         let print_loop = async move {
-            // println!("layer,scenario,test,name,size,messages");
             loop {
                 let now = Instant::now();
                 async_std::task::sleep(Duration::from_secs(1)).await;
@@ -238,13 +252,14 @@ impl Node for ThrSink {
                 let c = loop_accumulator.swap(0, Ordering::Relaxed);
                 if c > 0 {
                     let interval = 1_000_000.0 / elapsed;
-                    println!(
-                        "{},same-runtime,throughput,{},{},{}",
-                        layer,
-                        "test-name",
-                        loop_payload_size,
-                        (c as f64 / interval).floor() as usize
-                    );
+                    let msgs = (c as f64 / interval).floor() as usize;
+                    // framework, scenario, test, pipeline, payload, rate, value, unit
+                    println!("zenoh-flow,{scenario},throughput,1,{loop_payload_size},{msgs},{msgs},msgs");
+
+                    // println!(
+                    //     // layer,scenario,test,name,messages,pipeline,latency,payload,unit
+                    //     "zenoh-flow,{scenario},throughput,{test_name},{msgs},1,0,{loop_payload_size},msgs"
+                    // );
                 }
             }
         };
@@ -307,7 +322,14 @@ impl Sink for ScalPongSink {
         let msgs = real_state.msgs;
         let pipeline = real_state.nodes;
         // layer,scenario name,test kind, test name, payload size, msg/s, pipeline size, latency, unit
-        println!("{layer},scalability,latency,pipeline,{msgs},{pipeline},{elapsed},us");
+        // println!("{layer},scalability,latency,pipeline,{msgs},{pipeline},{elapsed},us");
+
+        // layer,scenario,test,name,messages,pipeline,latency,x,unit
+        println!("zenoh-flow,{layer},latency,zenoh-flow-latency,{msgs},{pipeline},{elapsed},8,us");
+
+
+        // framework, scenario, test, pipeline, payload, rate, value, unit
+        println!("zenoh-flow,{layer},latency,{pipeline},8,{msgs},{elapsed},us");
 
         // pong back
         real_state
@@ -354,8 +376,8 @@ impl Node for ScalPongSink {
         };
 
         let layer = match multi {
-            true => "zenoh-flow-multi".to_string(),
-            false => "zenoh-flow".to_string(),
+            true => "multi".to_string(),
+            false => "single".to_string(),
         };
 
         let diff = match mode {
@@ -370,7 +392,8 @@ impl Node for ScalPongSink {
 
         let locator = format!("tcp/127.0.0.1:{}", rng.gen_range(8000..65000));
         config
-            .set_listeners(vec![locator.parse().unwrap()])
+            .listen
+            .set_endpoints(vec![locator.parse().unwrap()])
             .unwrap();
         let session = zenoh::open(config).wait().unwrap().into_arc();
 

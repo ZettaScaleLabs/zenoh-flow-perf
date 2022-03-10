@@ -2,8 +2,8 @@
 
 
 plog () {
-TS=`eval date "+%F-%T"`
-   echo "[$TS]: $1"
+   LOG_TS=`eval date "+%F-%T"`
+   echo "[$LOG_TS]: $1"
 }
 
 usage() { printf "Usage: $0 \n\t
@@ -24,14 +24,14 @@ fi
 
 
 
-TS=$(date "+%F-%T")
+TS=$(date +%Y%m%d.%H%M%S)
 
 N_CPU=$(nproc)
 
 CHAIN_LENGTH=1
 BIN_DIR="./target/release/examples"
 ROS_BIN_DIR="./comparison/ros/eval-ws/build"
-CYCLONEDDS_URI="./comparison/cyclonedds/cyclonedds.xml"
+# CYCLONEDDS_URI="./comparison/cyclonedds/cyclonedds.xml"
 
 WD=$(pwd)
 
@@ -67,6 +67,11 @@ CPUS="${CPUS:-0,1}"
 mkdir -p $OUT_DIR
 NICE="${NICE:--10}"
 ROS_MASTER_URI="${ROS_MASTER_URI:-http://127.0.0.1:11311}"
+CYCLONEDDS_URI="${CYCLONEDDS_URI}"
+LISTEN="${LISTEN:-tcp/127.0.0.1:7447}"
+CONNECT="${LISTEN:-tcp/127.0.0.1:7887}"
+
+
 # Run source by default:
 # - 1 = Source
 # - 2 = Operator
@@ -108,28 +113,29 @@ while getopts "ioemzrR" arg; do
       ;;
    z)
       # Zenoh Flow
+      descriptor_file="descriptor-src-op-sink-$MSGS.yaml"
       case ${TORUN} in
       1)
          plog "[ RUN ] Running Zenoh Flow source with msg/s $MSGS"
          $BIN_DIR/$LAT_DYNAMIC --ping -m $MSGS -d $descriptor_file > /dev/null 2>&1
-         timeout $DURATION nice $NICE taskset -c $CPUS $BIN_DIR/$LAT_DYNAMIC -r -n "src" -d $descriptor_file > /dev/null 2>&1
+         timeout $DURATION nice $NICE taskset -c $CPUS $BIN_DIR/$LAT_DYNAMIC -r -n "src" -d $descriptor_file --listen $LISTEN --connect $CONNECT> /dev/null 2>&1
          plog "[ DONE ] Running Zenoh Flow source with msg/s $MSGS"
          rm $descriptor_file
          ;;
       2)
          plog "[ RUN ] Running Zenoh Flow operator with msg/s $MSGS"
          $BIN_DIR/$LAT_DYNAMIC --ping -m $MSGS -d $descriptor_file > /dev/null 2>&1
-         nice $NICE taskset -c $CPUS $BIN_DIR/$LAT_DYNAMIC -r -n "comp0" -d $descriptor_file > /dev/null 2>&1
+         nice $NICE taskset -c $CPUS $BIN_DIR/$LAT_DYNAMIC -r -n "comp0" -d $descriptor_file --listen $LISTEN --connect $CONNECT > /dev/null 2>&1
          plog "[ DONE ] Running Zenoh Flow operator with msg/s $MSGS"
          rm $descriptor_file
          ;;
       3)
-         LOG_FILE="$OUT_DIR/zf-src-op-sink-dynamic-pp-$TS.csv"
+         LOG_FILE="$OUT_DIR/zf-lat-dynamic-$TS.csv"
          echo "framework,scenario,test,pipeline,payload,rate,value,unit" > $LOG_FILE
 
          plog "[ RUN ] Running Zenoh Flow sink with msg/s $MSGS logging to $LOG_FILE"
          $BIN_DIR/$LAT_DYNAMIC --ping -m $MSGS -d $descriptor_file > /dev/null 2>&1
-         nice $NICE taskset -c $CPUS $BIN_DIR/$LAT_DYNAMIC -r -n "snk" -d $descriptor_file >> $LOG_FILE 2> /dev/null
+         nice $NICE taskset -c $CPUS $BIN_DIR/$LAT_DYNAMIC -r -n "snk" -d $descriptor_file --listen $LISTEN --connect $CONNECT >> $LOG_FILE 2> /dev/null
          plog "[ DONE ] Running Zenoh Flow sink with msg/s $MSGS, logged to $LOG_FILE"
          rm $descriptor_file
          ;;
@@ -143,8 +149,10 @@ while getopts "ioemzrR" arg; do
 
       export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       export ROS_LOCALHOST_ONLY=1
+      export CYCLONEDDS_URI=$CYCLONEDDS_URI
       source /opt/ros/galactic/setup.bash
       source $ROS2_COMPARISON_DIR/install/setup.bash
+
 
       case ${TORUN} in
       1)
@@ -155,7 +163,7 @@ while getopts "ioemzrR" arg; do
          ;;
       2)
          plog "[ RUN ] Running ROS2 operator with msg/s $MSGS"
-         nice $NICE taskset -c $CPUS $ROS2_OP "out_0" "out_1" > /dev/null 2>&1
+         nice $NICE taskset -c $CPUS $ROS2_OP "out_0" "out_1" > /dev/null  2>&1
          plog "[ DONE ] Running ROS2 operator with msg/s $MSGS"
          ps -ax | grep compute_ros | awk {'print $1'} | xargs kill -9 > /dev/null  2>&1
          ;;
@@ -164,7 +172,7 @@ while getopts "ioemzrR" arg; do
          echo "framework,scenario,test,pipeline,payload,rate,value,unit" > $LOG_FILE
 
          plog "[ RUN ] Running ROS2 sink with msg/s $MSGS logging to $LOG_FILE"
-         nice $NICE taskset -c $CPUS $ROS2_SINK $s $CHAIN_LENGTH "out_1" >> $LOG_FILE 2> /dev/null
+         nice $NICE taskset -c $CPUS $ROS2_SINK $MSGS $CHAIN_LENGTH "out_1" >> $LOG_FILE 2> /dev/null
          plog "[ DONE ] Running ROS2 sink with msg/s $MSGS, logged to $LOG_FILE"
          ps -ax | grep receiver_ros | awk {'print $1'} | xargs kill -9 > /dev/null  2>&1
          ;;
@@ -174,6 +182,7 @@ while getopts "ioemzrR" arg; do
       esac
       unset RMW_IMPLEMENTATION
       unset ROS_LOCALHOST_ONLY
+      unset CYCLONEDDS_URI
       ;;
    R)
       # ROS

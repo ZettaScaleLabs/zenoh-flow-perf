@@ -2,8 +2,8 @@
 
 
 plog () {
-TS=`eval date "+%F-%T"`
-   echo "[$TS]: $1"
+   LOG_TS=`eval date "+%F-%T"`
+   echo "[$LOG_TS]: $1"
 }
 
 usage() { printf "Usage: $0 \n\t-f flume\n\t-l link\n\t-s static\n\t-d dynamic\n\t-z zenoh\n\t-c CycloneDDS\n\t-r ROS2\n\t-R ROS\n" 1>&2; exit 1; }
@@ -17,7 +17,7 @@ fi
 
 
 
-TS=$(date "+%F-%T")
+TS=$(date +%Y%m%d.%H%M%S)
 
 N_CPU=$(nproc)
 

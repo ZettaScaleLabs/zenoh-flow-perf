@@ -6,7 +6,7 @@ This repository contains the script and binaries for zenoh flow performance figu
 
 1. Install [rust](https://www.rust-lang.org/it)
 2. Install all the dependencies `cmake bison`, [argparse](https://github.com/p-ranav/argparse)
-3. Install [ROS2](https://docs.ros.org/en/foxy/Installation.html), the [CycloneDDS RMW](https://docs.ros.org/en/foxy/Installation/DDS-Implementations/Working-with-Eclipse-CycloneDDS.html), and [colcon](https://docs.ros.org/en/foxy/Tutorials/Colcon-Tutorial.html)
+3. Install [ROS2](https://docs.ros.org/en/galactic/Installation.html), the [CycloneDDS RMW](https://docs.ros.org/en/galactic/Installation/DDS-Implementations/Working-with-Eclipse-CycloneDDS.html), and [colcon](https://docs.ros.org/en/galactic/Tutorials/Colcon-Tutorial.html)
 4. Install [CycloneDDS](https://github.com/eclipse-cyclonedds/cyclonedds)
 5. Install the parsing requirements `pip3 install -r requirements.txt`
 

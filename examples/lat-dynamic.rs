@@ -46,6 +46,10 @@ struct CallArgs {
     descriptor_file: String,
     #[clap(short, long)]
     ping: bool,
+    #[clap(short, long)]
+    listen: Vec<String>,
+    #[clap(short, long)]
+    connect: Vec<String>,
 }
 
 // Run dataflow in single runtime
@@ -54,7 +58,13 @@ async fn main() {
     let args = CallArgs::parse();
 
     if args.runtime {
-        zenoh_flow_perf::runtime::runtime(args.name, args.descriptor_file.clone()).await;
+        zenoh_flow_perf::runtime::runtime(
+            args.name,
+            args.descriptor_file.clone(),
+            args.listen,
+            args.connect,
+        )
+        .await;
     }
 
     let interval = 1.0 / (args.msgs as f64);

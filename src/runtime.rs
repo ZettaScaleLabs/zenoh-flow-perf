@@ -5,14 +5,31 @@ use zenoh_flow::async_std::sync::Arc;
 use zenoh_flow::runtime::dataflow::loader::{Loader, LoaderConfig};
 use zenoh_flow::runtime::RuntimeContext;
 
-pub async fn runtime(name: String, descriptor_file: String) {
+pub async fn runtime(
+    name: String,
+    descriptor_file: String,
+    listen: Vec<String>,
+    connect: Vec<String>,
+) {
     env_logger::init();
 
     let yaml_df = read_to_string(descriptor_file).unwrap();
 
     let loader_config = LoaderConfig::new();
 
-    let session = Arc::new(zenoh::open(zenoh::config::Config::default()).await.unwrap());
+    let mut config = zenoh::config::Config::default();
+    config
+        .set_mode(Some(zenoh::config::whatami::WhatAmI::Peer))
+        .unwrap();
+
+    for l in listen {
+        config.listen.endpoints.push(l.parse().unwrap());
+    }
+    for c in connect {
+        config.connect.endpoints.push(c.parse().unwrap());
+    }
+
+    let session = Arc::new(zenoh::open(config).await.unwrap());
     let hlc = async_std::sync::Arc::new(uhlc::HLC::default());
     let loader = Arc::new(Loader::new(loader_config));
 

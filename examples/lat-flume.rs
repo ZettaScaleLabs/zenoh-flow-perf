@@ -12,20 +12,20 @@
 //   ADLINK zenoh team, <zenoh@adlink-labs.tech>
 //
 
+use clap::Parser;
 use std::time::Duration;
-use structopt::StructOpt;
 use zenoh_flow::async_std::task;
 use zenoh_flow_perf::{get_epoch_us, Latency};
 
 static DEFAULT_PIPELINE: &str = "1";
 static DEFAULT_MSGS: &str = "1";
 
-#[derive(StructOpt, Debug)]
+#[derive(Parser, Debug)]
 struct CallArgs {
     /// Config file
-    #[structopt(short, long, default_value = DEFAULT_PIPELINE)]
+    #[clap(short, long, default_value = DEFAULT_PIPELINE)]
     pipeline: u64,
-    #[structopt(short, long, default_value = DEFAULT_MSGS)]
+    #[clap(short, long, default_value = DEFAULT_MSGS)]
     msgs: u64,
 }
 
@@ -33,7 +33,7 @@ struct CallArgs {
 async fn main() {
     env_logger::init();
 
-    let args = CallArgs::from_args();
+    let args = CallArgs::parse();
 
     let (sender_ping, receiver_ping) = flume::unbounded::<Latency>();
     let (sender_pong, receiver_pong) = flume::unbounded::<()>();

@@ -12,7 +12,7 @@
 //   ADLINK zenoh team, <zenoh@adlink-labs.tech>
 //
 
-use structopt::StructOpt;
+use clap::Parser;
 use zenoh_flow::async_std::sync::Arc;
 use zenoh_flow::model::{InputDescriptor, OutputDescriptor};
 use zenoh_flow::runtime::dataflow::instance::DataflowInstance;
@@ -24,11 +24,11 @@ use zenoh_flow_perf::operators::{LatSource, NoOpPrint, LAT_PORT};
 static DEFAULT_PIPELINE: &str = "1";
 static DEFAULT_MSGS: &str = "1";
 
-#[derive(StructOpt, Debug)]
+#[derive(Parser, Debug)]
 struct CallArgs {
-    #[structopt(short, long, default_value = DEFAULT_PIPELINE)]
+    #[clap(short, long, default_value = DEFAULT_PIPELINE)]
     pipeline: u64,
-    #[structopt(short, long, default_value = DEFAULT_MSGS)]
+    #[clap(short, long, default_value = DEFAULT_MSGS)]
     msgs: u64,
 }
 
@@ -37,7 +37,7 @@ struct CallArgs {
 async fn main() {
     env_logger::init();
 
-    let args = CallArgs::from_args();
+    let args = CallArgs::parse();
 
     let interval = 1.0 / (args.msgs as f64);
 

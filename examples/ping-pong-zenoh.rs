@@ -13,29 +13,29 @@
 //
 
 use async_std::stream::StreamExt;
+use clap::Parser;
 use rand::Rng;
 use std::io::{self, Write};
 use std::time::Duration;
-use structopt::StructOpt;
+use zenoh::net::protocol::io::SplitBuffer;
 use zenoh::prelude::*;
 use zenoh::publication::CongestionControl;
 use zenoh_flow::{Data, Message};
 use zenoh_flow_perf::{get_epoch_us, Latency};
-use zenoh::net::protocol::io::SplitBuffer;
 
 static DEFAULT_PIPELINE: &str = "1";
 static DEFAULT_MSGS: &str = "1";
 
-#[derive(StructOpt, Debug)]
+#[derive(Parser, Debug)]
 struct CallArgs {
     /// Config file
-    #[structopt(short, long, default_value = DEFAULT_PIPELINE)]
+    #[clap(short, long, default_value = DEFAULT_PIPELINE)]
     length: u64,
-    #[structopt(short, long, default_value = DEFAULT_MSGS)]
+    #[clap(short, long, default_value = DEFAULT_MSGS)]
     msgs: u64,
-    #[structopt(short, long)]
+    #[clap(short, long)]
     ping: bool,
-    #[structopt(short, long)]
+    #[clap(short, long)]
     udp: bool,
 }
 
@@ -71,8 +71,8 @@ async fn pong(session: zenoh::Session, msgs: u64, pipeline: u64, udp: bool) {
     let pong_data: Vec<u8> = vec![];
     let mut sub = session.subscribe(&key_expr_ping).await.unwrap();
     let layer = match udp {
-        true => "zenoh-lat-p-udp",
-        false => "zenoh-lat-p",
+        true => "zenoh-udp",
+        false => "zenoh",
     };
 
     while let Some(msg) = sub.receiver().next().await {
@@ -85,7 +85,7 @@ async fn pong(session: zenoh::Session, msgs: u64, pipeline: u64, udp: bool) {
                 let elapsed = now - data.ts;
 
                 // framework,scenario,test,pipeline,payload,rate,value,unit
-                println!("zenoh,multi,latency,{pipeline},8,{msgs},{elapsed},us");
+                println!("{layer},multi,latency,{pipeline},8,{msgs},{elapsed},us");
 
                 io::stdout().flush().unwrap();
 
@@ -106,7 +106,7 @@ async fn main() {
 
     let mut rng = rand::thread_rng();
 
-    let args = CallArgs::from_args();
+    let args = CallArgs::parse();
 
     let interval = 1.0 / (args.msgs as f64);
 

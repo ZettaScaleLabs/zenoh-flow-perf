@@ -119,7 +119,6 @@ impl Sink for PongSink {
         let msgs = real_state.msgs;
         let pipeline = real_state.pipeline;
 
-
         // layer,scenario,test,name,messages,pipeline,latency,time,unit
         // println!("zenoh-flow,{layer},latency,zenoh-flow-latency,{msgs},{pipeline},{elapsed},8,us");
 
@@ -254,7 +253,9 @@ impl Node for ThrSink {
                     let interval = 1_000_000.0 / elapsed;
                     let msgs = (c as f64 / interval).floor() as usize;
                     // framework, scenario, test, pipeline, payload, rate, value, unit
-                    println!("zenoh-flow,{scenario},throughput,1,{loop_payload_size},{msgs},{msgs},msgs");
+                    println!(
+                        "zenoh-flow,{scenario},throughput,1,{loop_payload_size},{msgs},{msgs},msgs"
+                    );
 
                     // println!(
                     //     // layer,scenario,test,name,messages,pipeline,latency,payload,unit
@@ -326,7 +327,6 @@ impl Sink for ScalPongSink {
 
         // layer,scenario,test,name,messages,pipeline,latency,x,unit
         println!("zenoh-flow,{layer},latency,zenoh-flow-latency,{msgs},{pipeline},{elapsed},8,us");
-
 
         // framework, scenario, test, pipeline, payload, rate, value, unit
         println!("zenoh-flow,{layer},latency,{pipeline},8,{msgs},{elapsed},us");

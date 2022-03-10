@@ -12,11 +12,11 @@
 //   ADLINK zenoh team, <zenoh@adlink-labs.tech>
 //
 
+use clap::Parser;
 use std::convert::TryFrom;
 use std::fs::{File, *};
 use std::io::Write;
 use std::path::Path;
-use structopt::StructOpt;
 use zenoh_flow::async_std::sync::Arc;
 use zenoh_flow::model::dataflow::descriptor::{DataFlowDescriptor, Mapping};
 use zenoh_flow::model::link::{LinkDescriptor, PortDescriptor};
@@ -36,17 +36,17 @@ static SNK_URI: &str = "file://./target/release/examples/libdyn_sink.so";
 
 static PORT: &str = "Data";
 
-#[derive(StructOpt, Debug)]
+#[derive(Parser, Debug)]
 struct CallArgs {
-    #[structopt(short, long, default_value = DEFAULT_PIPELINE)]
+    #[clap(short, long, default_value = DEFAULT_PIPELINE)]
     pipeline: u64,
-    #[structopt(short, long, default_value = DEFAULT_MSGS)]
+    #[clap(short, long, default_value = DEFAULT_MSGS)]
     msgs: u64,
-    #[structopt(short, long)]
+    #[clap(short, long)]
     runtime: bool,
-    #[structopt(short, long, default_value = DEFAULT_RT_NAME)]
+    #[clap(short, long, default_value = DEFAULT_RT_NAME)]
     name: String,
-    #[structopt(short, long, default_value = DEFAULT_RT_DESCRIPTOR)]
+    #[clap(short, long, default_value = DEFAULT_RT_DESCRIPTOR)]
     descriptor_file: String,
 }
 
@@ -123,7 +123,7 @@ async fn runtime(name: String, descriptor_file: String) {
 // Run dataflow in single runtime
 #[async_std::main]
 async fn main() {
-    let args = CallArgs::from_args();
+    let args = CallArgs::parse();
 
     if args.runtime {
         runtime(args.name, args.descriptor_file.clone()).await;

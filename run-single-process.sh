@@ -7,9 +7,9 @@ TS=`eval date "+%F-%T"`
 }
 
 usage() { printf "Usage: $0 \n\t
-   -i static\n\t
+   -i source\n\t
    -o dynamic\n\t
-   -e zenoh\n\t
+   -e sink\n\t
    -m ros_master\n\t
    -z Zenoh Flow\n\t
    -r ROS2\n\t
@@ -78,7 +78,7 @@ TORUN=1
 plog "[ INIT ] Duration will be $DURATION seconds"
 plog "[ INIT ] Sending rate will be $MSGS msg/s"
 plog "[ INIT ] Size for throughput test will be $FINAL_SIZE"
-while getopts "ioezrR" arg; do
+while getopts "ioemzrR" arg; do
    case ${arg} in
    h)
       usage

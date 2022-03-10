@@ -12,7 +12,7 @@
 //   ADLINK zenoh team, <zenoh@adlink-labs.tech>
 //
 
-use structopt::StructOpt;
+use clap::Parser;
 use zenoh_flow::model::dataflow::descriptor::{DataFlowDescriptor, Mapping};
 use zenoh_flow::model::link::{LinkDescriptor, PortDescriptor};
 use zenoh_flow::model::node::{OperatorDescriptor, SinkDescriptor, SourceDescriptor};
@@ -32,26 +32,26 @@ static PONG_SNK_URI: &str = "file://./target/release/examples/libdyn_pong.so";
 
 static PORT: &str = "Data";
 
-#[derive(StructOpt, Debug)]
+#[derive(Parser, Debug)]
 struct CallArgs {
-    #[structopt(short, long, default_value = DEFAULT_PIPELINE)]
+    #[clap(short, long, default_value = DEFAULT_PIPELINE)]
     pipeline: u64,
-    #[structopt(short, long, default_value = DEFAULT_MSGS)]
+    #[clap(short, long, default_value = DEFAULT_MSGS)]
     msgs: u64,
-    #[structopt(short, long)]
+    #[clap(short, long)]
     runtime: bool,
-    #[structopt(short, long, default_value = DEFAULT_RT_NAME)]
+    #[clap(short, long, default_value = DEFAULT_RT_NAME)]
     name: String,
-    #[structopt(short, long, default_value = DEFAULT_RT_DESCRIPTOR)]
+    #[clap(short, long, default_value = DEFAULT_RT_DESCRIPTOR)]
     descriptor_file: String,
-    #[structopt(short, long)]
+    #[clap(short, long)]
     ping: bool,
 }
 
 // Run dataflow in single runtime
 #[async_std::main]
 async fn main() {
-    let args = CallArgs::from_args();
+    let args = CallArgs::parse();
 
     if args.runtime {
         zenoh_flow_perf::runtime::runtime(args.name, args.descriptor_file.clone()).await;

@@ -12,8 +12,8 @@
 //   ADLINK zenoh team, <zenoh@adlink-labs.tech>
 //
 
+use clap::Parser;
 use std::sync::atomic::{AtomicU64, Ordering};
-use structopt::StructOpt;
 use zenoh_flow::async_std::sync::Arc;
 use zenoh_flow::async_std::task;
 
@@ -22,13 +22,13 @@ static DEFAULT_SIZE: &str = "8";
 static DEFAULT_DURATION: &str = "60";
 use std::time::Duration;
 
-#[derive(StructOpt, Debug)]
+#[derive(Parser, Debug)]
 struct CallArgs {
-    #[structopt(short, long, default_value = DEFAULT_SIZE)]
+    #[clap(short, long, default_value = DEFAULT_SIZE)]
     size: u64,
-    #[structopt(short, long, default_value = DEFAULT_INT)]
+    #[clap(short, long, default_value = DEFAULT_INT)]
     interveal: u64,
-    #[structopt(short, long, default_value = DEFAULT_DURATION)]
+    #[clap(short, long, default_value = DEFAULT_DURATION)]
     duration: u64,
 }
 
@@ -36,7 +36,7 @@ struct CallArgs {
 async fn main() {
     env_logger::init();
 
-    let args = CallArgs::from_args();
+    let args = CallArgs::parse();
 
     let count: Arc<AtomicU64> = Arc::new(AtomicU64::new(0));
 

@@ -41,8 +41,7 @@ flume = "0.10"
 serde_json = "1.0"
 async-ctrlc ={version = "1.2.0", features = ["stream"]}
 async-trait = "0.1.50"
-structopt = "0.3.13"
-clap = "2.33"
+clap = { version = "3.1", features = ["derive"] }
 uuid = { version = "0.8", features = ["serde", "v4"] }
 
 [[example]]

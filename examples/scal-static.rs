@@ -13,10 +13,10 @@
 //
 
 use async_std::sync::Arc;
+use clap::Parser;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::str::FromStr;
-use structopt::StructOpt;
 use zenoh_flow::model::link::PortDescriptor;
 use zenoh_flow::model::{InputDescriptor, OutputDescriptor};
 use zenoh_flow::runtime::dataflow::instance::DataflowInstance;
@@ -31,7 +31,7 @@ static DEFAULT_MSGS: &str = "1";
 
 type ParseError = &'static str;
 
-#[derive(StructOpt, Debug)]
+#[derive(Parser, Debug)]
 enum FanKind {
     FanIn,
     FanOut,
@@ -50,20 +50,20 @@ impl FromStr for FanKind {
     }
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(Parser, Debug)]
 struct CallArgs {
-    #[structopt(short, long, default_value = DEFAULT_FANKIND)]
+    #[clap(short, long, default_value = DEFAULT_FANKIND)]
     kind: FanKind,
-    #[structopt(short, long, default_value = DEFAULT_FACTOR, help = "Scaling factor N, nodes will be 2^N")]
+    #[clap(short, long, default_value = DEFAULT_FACTOR, help = "Scaling factor N, nodes will be 2^N")]
     factor: u64,
-    #[structopt(short, long, default_value = DEFAULT_MSGS)]
+    #[clap(short, long, default_value = DEFAULT_MSGS)]
     msgs: u64,
 }
 
 // Run dataflow in single runtime
 #[async_std::main]
 async fn main() {
-    let args = CallArgs::from_args();
+    let args = CallArgs::parse();
 
     let interval = 1.0 / (args.msgs as f64);
 

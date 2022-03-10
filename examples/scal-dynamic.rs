@@ -12,10 +12,10 @@
 //   ADLINK zenoh team, <zenoh@adlink-labs.tech>
 //
 
+use clap::Parser;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::str::FromStr;
-use structopt::StructOpt;
 use zenoh_flow::model::dataflow::descriptor::{DataFlowDescriptor, Mapping};
 use zenoh_flow::model::link::{LinkDescriptor, PortDescriptor};
 use zenoh_flow::model::node::{OperatorDescriptor, SinkDescriptor, SourceDescriptor};
@@ -35,7 +35,7 @@ static PONG_SNK_URI: &str = "file://./target/release/examples/libdyn_pong_scal.s
 
 type ParseError = &'static str;
 
-#[derive(StructOpt, Debug)]
+#[derive(Parser, Debug)]
 enum FanKind {
     FanIn,
     FanOut,
@@ -54,26 +54,26 @@ impl FromStr for FanKind {
     }
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(Parser, Debug)]
 struct CallArgs {
-    #[structopt(short, long, default_value = DEFAULT_FANKIND)]
+    #[clap(short, long, default_value = DEFAULT_FANKIND)]
     kind: FanKind,
-    #[structopt(short, long, default_value = DEFAULT_FACTOR, help = "Scaling factor N, nodes will be 2^N")]
+    #[clap(short, long, default_value = DEFAULT_FACTOR, help = "Scaling factor N, nodes will be 2^N")]
     factor: u64,
-    #[structopt(short, long, default_value = DEFAULT_MSGS)]
+    #[clap(short, long, default_value = DEFAULT_MSGS)]
     msgs: u64,
-    #[structopt(short, long)]
+    #[clap(short, long)]
     runtime: bool,
-    #[structopt(short, long, default_value = DEFAULT_RT_NAME)]
+    #[clap(short, long, default_value = DEFAULT_RT_NAME)]
     name: String,
-    #[structopt(short, long, default_value = DEFAULT_RT_DESCRIPTOR)]
+    #[clap(short, long, default_value = DEFAULT_RT_DESCRIPTOR)]
     descriptor_file: String,
 }
 
 // Run dataflow in single runtime
 #[async_std::main]
 async fn main() {
-    let args = CallArgs::from_args();
+    let args = CallArgs::parse();
 
     if args.runtime {
         zenoh_flow_perf::runtime::runtime(args.name, args.descriptor_file.clone()).await;

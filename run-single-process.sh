@@ -199,7 +199,7 @@ while getopts "ioemzrR" arg; do
          echo "framework,scenario,test,pipeline,payload,rate,value,unit" > $LOG_FILE
 
          plog "[ RUN ] Running ROS sink with msg/s $MSGS logging to $LOG_FILE"
-         nice $NICE taskset -c $CPUS $ROS_BIN_DIR/$ROS_SINK $s $CHAIN_LENGTH "out_1" >> $LOG_FILE 2> /dev/null
+         nice $NICE taskset -c $CPUS $ROS_BIN_DIR/$ROS_SINK $MSGS $CHAIN_LENGTH "out_1" >> $LOG_FILE 2> /dev/null
          plog "[ DONE ] Running ROS sink with msg/s $MSGS, logged to $LOG_FILE"
          ps -ax | grep receiver_node | awk {'print $1'} | xargs kill -9 > /dev/null 2>&1
          ;;

@@ -205,7 +205,7 @@ while getopts "ioezrR" arg; do
          ;;
       4)
          plog "[ RUN ] Running ROS master"
-         roscore -p 11311
+         nice $NICE taskset -c $CPUS roscore -p 11311
          ;;
       *)
          usage

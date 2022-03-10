@@ -68,35 +68,34 @@ def prepare(log_dir):
     log = read_log(log_dir)
 
     # Remove first and last two samples of every test
-    mask = log.groupby(['layer', 'test' ,'name','messages','pipeline']).transform(
-    mask_first_and_last)['latency']
+    mask = log.groupby(['framework', 'scenario','test','pipeline','payload','rate']).transform(
+    mask_first_and_last)['value']
     log = log.loc[mask]
 
     # this converts everything to seconds, data is expected as micro seconds
-    log['latency']= [ v/1000000 for v in log['latency']] #TODO there is a unit field that should be used for the conversion
+    log['value']= [ v/1000000 for v in log['value']] #TODO there is a unit field that should be used for the conversion
 
-    log.sort_values(by='messages', inplace=True)
-    log['name'] = log['name'].astype(str)
-    log['label'] = [interval_label(v) for k, v in log['messages'].iteritems()]
+    log.sort_values(by='rate', inplace=True)
+    log['framework'] = log['framework'].astype(str)
+    log['label'] = [interval_label(v) for k, v in log['rate'].iteritems()]
 
     # adding count of samples
-    log['counter'] = log.groupby(['layer', 'test' ,'name','messages','pipeline'])['layer'].cumcount().add(1)
+    log['counter'] = log.groupby(['framework', 'scenario','test','pipeline','payload','rate'])['framework'].cumcount().add(1)
 
     log = log.reset_index()
     return log
 
 def filter(log, process, msgs=None, pipeline=None):
-    layers = log['layer'].unique()
+    layers = log['framework'].unique()
 
-    # filtering if multi process or same process
-    if process == 'multi':
-        log = log[log['layer'].isin(['zenoh-lat','zf-source-sink-multi','zenoh-flow-multi','zf-source-op-multi','zenoh-lat-udp','ros2','zenoh-lat-p','zenoh-lat-p-udp','cyclonedds'])]
-    elif process == 'single':
-        log = log[log['layer'].isin(['flume','zf-link','zenoh-flow','zf-source-op','zenoh-source-sink'])]
+    # filtering if multi process or same process\
+    log = log[log['scenario'].isin([process])]
+
+
 
     # filtering is msg/s is set
     if msgs is not None:
-        log = log[log['messages']==msgs]
+        log = log[log['rate']==msgs]
 
     if pipeline is not None:
         log = log[log['pipeline']==pipeline]
@@ -120,36 +119,33 @@ def compute_overhead(log, overhead):
 
     log_overhead = pd.DataFrame(columns=log.columns)
     i = 0
-    dfs = {'layer':[],'test':[],'scenario':[],'name':[],'pipeline':[],'messages':[],'unit':[],'label':[],'counter':[],'latency':[]}
+    dfs = {'framework':[],'scenario':[],'test':[],'pipeline':[],'payload':[],'rate':[],'value':[],'unit':[]}
     for (x,y) in couples:
 
         # layer,scenario,test,name,messages,pipeline,latency,unit
-        msgs = log['messages'].unique()
+        msgs = log['rate'].unique()
 
-        log_y = log[log['layer']==y]
-        log_x = log[log['layer']==x]
+        log_y = log[log['framework']==y]
+        log_x = log[log['framework']==x]
 
         for m in msgs:
-            df_x = log_x[log_x['messages']==m]
+            df_x = log_x[log_x['rate']==m]
 
-            median_latency_x = np.median(df_x['latency'])*2
+            median_latency_x = np.median(df_x['value'])*2
 
-            df_y = log_y[log_y['messages']==m]
+            df_y = log_y[log_y['rate']==m]
 
-            median_latency_y = np.median(df_y['latency'])
+            median_latency_y = np.median(df_y['value'])
 
             latency_diff = median_latency_y - median_latency_x
 
-            dfs['layer'].append(f'{y}-overhead')
+            dfs['framework'].append(f'{y}-overhead')
+            dfs['scenario'].append('multi')
             dfs['test'].append('latency')
-            dfs['scenario'].append('overhead')
-            dfs['name'].append('overhead')
             dfs['pipeline'].append(1)
-            dfs['messages'].append(m)
+            dfs['payload'].append(8)
+            dfs['rate'].append(m)
             dfs['unit'].append('us')
-            dfs['label'].append(interval_label(m))
-            dfs['latency'].append(latency_diff)
-            dfs['counter'].append(i)
             i+=1
 
     log_overhead = pd.concat([log_overhead, pd.DataFrame.from_dict(dfs)])
@@ -160,7 +156,7 @@ def latency_ecfd_plot(log, scale, outfile):
 
     fig, axes = plt.subplots()
 
-    g = sns.ecdfplot(data=log, x='latency', palette=palette, hue='layer', label='layer')
+    g = sns.ecdfplot(data=log, x='value', palette=palette, hue='framework', label='framework')
 
 
     plt.grid(which='major', color='grey', linestyle='-', linewidth=0.1)
@@ -185,7 +181,7 @@ def latency_pdf_plot(log, scale, outfile):
 
     fig, axes = plt.subplots()
 
-    g = sns.displot(data=log, x='latency', palette=palette, hue='layer', label='layer')
+    g = sns.displot(data=log, x='value', palette=palette, hue='framework', label='framework')
 
 
     plt.grid(which='major', color='grey', linestyle='-', linewidth=0.1)
@@ -210,8 +206,8 @@ def latency_stat_plot(log, scale, outfile):
 
     fig, axes = plt.subplots()
 
-    g = sns.lineplot(data=log, x='label', y='latency', palette=palette,
-                ci=95, err_style='band', hue='layer',
+    g = sns.lineplot(data=log, x='label', y='value', palette=palette,
+                ci=95, err_style='band', hue='framework',
                 estimator=np.median, style='pipeline')
 
     if scale == 'log':
@@ -224,7 +220,7 @@ def latency_stat_plot(log, scale, outfile):
     plt.xlabel('Messages per seconds (msg/s)')
 
     plt.ylabel('Latency (seconds)')
-    plt.legend(title='Layer', loc='center left', bbox_to_anchor=(1.0, 0.5))
+    plt.legend(title='Framework', loc='center left', bbox_to_anchor=(1.0, 0.5))
 
     ticker = mpl.ticker.EngFormatter(unit='')
     axes.yaxis.set_major_formatter(ticker)
@@ -236,10 +232,10 @@ def latency_stat_plot(log, scale, outfile):
 def latency_time_plot(log, scale, outfile):
 
     # set same samples size for all layers
-    layers = log['layer'].unique()
+    layers = log['framework'].unique()
     maxs = []
     for l in layers:
-        maxs.append(log[log['layer']==l]['counter'].max())
+        maxs.append(log[log['framework']==l]['counter'].max())
 
     min_max = min(maxs)
 
@@ -247,9 +243,9 @@ def latency_time_plot(log, scale, outfile):
 
     fig, axes = plt.subplots()
 
-    g = sns.lineplot(data=log, x='counter',y='latency', palette=palette,
+    g = sns.lineplot(data=log, x='counter',y='valye', palette=palette,
                 #ci='sd', err_style='band', estimator="median",
-                hue='layer')#, style='pipeline')
+                hue='framework')#, style='pipeline')
 
     if scale == 'log':
         g.set_yscale('log')
@@ -262,7 +258,7 @@ def latency_time_plot(log, scale, outfile):
     plt.xlabel('Index')
 
     plt.ylabel('Latency (seconds)')
-    plt.legend(title='Layer', loc='center left', bbox_to_anchor=(1.0, 0.5))
+    plt.legend(title='Framework', loc='center left', bbox_to_anchor=(1.0, 0.5))
 
 
     ticker = mpl.ticker.EngFormatter(unit='')

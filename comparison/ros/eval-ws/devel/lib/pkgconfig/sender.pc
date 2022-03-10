@@ -1,8 +1,0 @@
-prefix=/home/ato/Workspace/zenoh-flow-perf/comparison/ros/eval-ws/devel
-
-Name: sender
-Description: Description of sender
-Version: 0.0.1
-Cflags: 
-Libs: -L${prefix}/lib 
-Requires: 

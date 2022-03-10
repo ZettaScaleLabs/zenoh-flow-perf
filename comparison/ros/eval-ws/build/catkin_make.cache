@@ -1,2 +1,0 @@
-eval_interfaces:receiver:sender
--DCATKIN_DEVEL_PREFIX=/home/ato/Workspace/zenoh-flow-perf/comparison/ros/eval-ws/devel -DCMAKE_INSTALL_PREFIX=/home/ato/Workspace/zenoh-flow-perf/comparison/ros/eval-ws/install -G Unix Makefiles

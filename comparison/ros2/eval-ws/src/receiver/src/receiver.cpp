@@ -41,7 +41,7 @@ void Receiver::receiver_callback(const eval_interfaces::msg::Evaluation::SharedP
     // RCLCPP_INFO(this->get_logger(), "Receiver!, %ul - %ul = %dus", msg->emitter_ts, ts, latency);
 
     // framework,scenario,test,pipeline,payload,rate,value,unit
-    std::cout << "ros2,multi,latency," << this->pipeline_length << ",8," << this->msgs << "," << this->msgs << "," << latency << ",us" << std::endl << std::flush;
+    std::cout << "ros2,multi,latency," << this->pipeline_length << ",8," << this->msgs << "," << latency << ",us" << std::endl << std::flush;
 
     auto message = eval_interfaces::msg::Evaluation();
     message.emitter_ts = 0;

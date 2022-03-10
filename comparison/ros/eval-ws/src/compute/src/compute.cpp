@@ -27,7 +27,7 @@ Compute::Compute(const std::string listen_topic, const std::string publish_topic
     this->publisher = this->nh.advertise<eval_interfaces::Evaluation>(publish_topic, 1024);
     this->subscriber = this->nh.subscribe(listen_topic, 1000, &Compute::receiver_callback, this);
 
-    ROS_INFO("Init Compute with listener: %s and subscriber %s", listen_topic, publish_topic);
+    // ROS_INFO("Init Compute with listener: %s and subscriber %s", listen_topic, publish_topic);
 }
 
 void Compute::publish_message(const eval_interfaces::Evaluation::ConstPtr& msg) {

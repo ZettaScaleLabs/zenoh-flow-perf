@@ -41,7 +41,7 @@ void Receiver::receiver_callback(const eval_interfaces::Evaluation::ConstPtr& ms
     auto latency = ts - msg->emitter_ts;
 
     // framework,scenario,test,pipeline,payload,rate,value,unit
-    std::cout << "ros,multi,latency," << this->pipeline_length << ",8," << this->msgs << "," << this->msgs << "," << latency << ",us" << std::endl << std::flush;
+    std::cout << "ros,multi,latency," << this->pipeline_length << ",8," << this->msgs << "," << latency << ",us" << std::endl << std::flush;
 
     eval_interfaces::Evaluation message;
     message.emitter_ts = 0;

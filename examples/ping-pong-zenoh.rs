@@ -85,7 +85,7 @@ async fn pong(session: zenoh::Session, msgs: u64, pipeline: u64, udp: bool) {
                 let elapsed = now - data.ts;
 
                 // framework,scenario,test,pipeline,payload,rate,value,unit
-                println!("zenoh,multi,latency,{pipeline},8,{msgs},{msgs},{elapsed},us")
+                println!("zenoh,multi,latency,{pipeline},8,{msgs},{elapsed},us");
 
                 io::stdout().flush().unwrap();
 

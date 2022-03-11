@@ -326,7 +326,7 @@ impl Sink for ScalPongSink {
         // println!("{layer},scalability,latency,pipeline,{msgs},{pipeline},{elapsed},us");
 
         // layer,scenario,test,name,messages,pipeline,latency,x,unit
-        println!("zenoh-flow,{layer},latency,zenoh-flow-latency,{msgs},{pipeline},{elapsed},8,us");
+        // println!("zenoh-flow,{layer},latency,zenoh-flow-latency,{msgs},{pipeline},{elapsed},8,us");
 
         // framework, scenario, test, pipeline, payload, rate, value, unit
         println!("zenoh-flow,{layer},latency,{pipeline},8,{msgs},{elapsed},us");

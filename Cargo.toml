@@ -76,6 +76,14 @@ crate-type = ["cdylib"]
 name = "dyn-pong-scal"
 crate-type = ["cdylib"]
 
+[[example]]
+name = "dyn-thr-source"
+crate-type = ["cdylib"]
+
+[[example]]
+name = "dyn-thr-sink"
+crate-type = ["cdylib"]
+
 
 [target.x86_64-unknown-linux-gnu]
 linker = "/usr/bin/clang"

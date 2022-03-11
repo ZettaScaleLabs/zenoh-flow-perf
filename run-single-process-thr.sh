@@ -150,13 +150,13 @@ while getopts "ioemzrR" arg; do
       case ${TORUN} in
       1)
          plog "[ RUN ] Running ROS2 source with size $SIZE"
-         timeout $DURATION nice $NICE taskset -c $CPUS $ROS2_SRC $SIZE #> /dev/null 2>&1
+         timeout $DURATION nice $NICE taskset -c $CPUS $ROS2_SRC $SIZE > /dev/null 2>&1
          plog "[ DONE ] Running ROS2 source with size $SIZE"
          ps -ax | grep sender_ros_thr | awk {'print $1'} | xargs kill -9 > /dev/null  2>&1
          ;;
       2)
          plog "[ RUN ] Running ROS2 operator with size $SIZE"
-         nice $NICE taskset -c $CPUS $ROS2_OP "out_0" "out_1" #> /dev/null  2>&1
+         nice $NICE taskset -c $CPUS $ROS2_OP "out_0" "out_1" > /dev/null  2>&1
          plog "[ DONE ] Running ROS2 operator with size $SIZE"
          ps -ax | grep compute_ros_thr | awk {'print $1'} | xargs kill -9 > /dev/null  2>&1
          ;;
@@ -165,7 +165,7 @@ while getopts "ioemzrR" arg; do
          echo "framework,scenario,test,pipeline,payload,rate,value,unit" > $LOG_FILE
 
          plog "[ RUN ] Running ROS2 sink with size $SIZE logging to $LOG_FILE"
-         nice $NICE taskset -c $CPUS $ROS2_SINK $SIZE $CHAIN_LENGTH "out_1" #>> $LOG_FILE 2> /dev/null
+         nice $NICE taskset -c $CPUS $ROS2_SINK $SIZE $CHAIN_LENGTH "out_1" >> $LOG_FILE 2> /dev/null
          plog "[ DONE ] Running ROS2 sink with size $SIZE, logged to $LOG_FILE"
          ps -ax | grep receiver_ros_thr | awk {'print $1'} | xargs kill -9 > /dev/null  2>&1
          ;;

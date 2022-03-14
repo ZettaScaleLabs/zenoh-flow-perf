@@ -74,7 +74,6 @@ TORUN=1
 
 
 plog "[ INIT ] Duration will be $DURATION seconds"
-plog "[ INIT ] Sending rate will be $MSGS msg/s"
 plog "[ INIT ] Size for throughput test will be $SIZE"
 while getopts "ioemzrR" arg; do
    case ${arg} in

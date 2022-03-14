@@ -22,7 +22,7 @@
 
 using ato::receiver::Receiver;
 
-Receiver::Receiver(const uint64_t msgs, const std::string topic_name, const uint64_t pipeline_length) : rclcpp::Node("receiver_node", rclcpp::NodeOptions().use_intra_process_comms(false)) {
+Receiver::Receiver(const uint64_t size, const std::string topic_name, const uint64_t pipeline_length) : rclcpp::Node("receiver_node", rclcpp::NodeOptions().use_intra_process_comms(false)) {
     auto qos = rclcpp::QoS(rclcpp::KeepAll()).reliable();
     this->size = size;
     this->pipeline_length = pipeline_length;

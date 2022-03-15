@@ -17,6 +17,7 @@
 #include "receiver/receiver.hpp"
 #include <atomic>
 
+#define QUEUE_LENGTH 10
 
 using ato::ros_receiver::Receiver;
 
@@ -26,7 +27,7 @@ Receiver::Receiver(const uint64_t size, const std::string topic_name, const uint
     this->nh = nh;
     this->size = size;
     this->pipeline_length = pipeline_length;
-    this->subscriber = this->nh.subscribe(topic_name,1024, &Receiver::receiver_callback, this);
+    this->subscriber = this->nh.subscribe(topic_name,QUEUE_LENGTH, &Receiver::receiver_callback, this);
     this->recv.store(0);
 
 
@@ -40,10 +41,10 @@ void Receiver::print_stat(const uint64_t elapsed){
     float interval = 1000000 / float(elapsed);
     uint64_t msgs = (uint64_t) ((float) received/interval);
 
-    if (msgs > 0) {
+    // if (msgs > 0) {
         // framework,scenario,test,pipeline,payload,rate,value,unit
         std::cout << "ros,multi,latency," << this->pipeline_length << "," << this->size << "," << msgs << "," << msgs << ",msgs" << std::endl << std::flush;
-    }
+    // }
 
 }
 

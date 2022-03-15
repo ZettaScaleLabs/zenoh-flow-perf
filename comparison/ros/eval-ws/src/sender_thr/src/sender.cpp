@@ -16,12 +16,13 @@
 #include "eval_interfaces/Thr.h"
 #include "sender/sender.hpp"
 
+#define QUEUE_LENGTH 10
 
 using ato::ros_sender::Sender;
 
 Sender::Sender(const uint64_t size, ros::NodeHandle &nh) {
     this->nh = nh;
-    this->publisher = this->nh.advertise<eval_interfaces::Thr>("out_0", 1024);
+    this->publisher = this->nh.advertise<eval_interfaces::Thr>("out_0", QUEUE_LENGTH);
     this->data = std::vector<uint8_t>();
     this->data.reserve(size);
 

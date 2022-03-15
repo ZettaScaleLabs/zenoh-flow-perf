@@ -45,7 +45,7 @@ int main(int argc, char **argv) {
     std::string output = program.get<std::string>("output");
 
 
-    ros::init(argc, argv, "compute");
+    ros::init(argc, argv, "compute_thr");
 
     ros::NodeHandle nh;
 

@@ -28,7 +28,8 @@ namespace ato {
                 ros::Subscriber subscriber;
                 void receiver_callback(const eval_interfaces::Thr::ConstPtr& msg);
                 void publish_message(const eval_interfaces::Thr::ConstPtr& msg);
-
+                std::string listen_topic;
+                std::string publish_topic;
 
             public:
                 explicit Compute(const std::string listen_topic, const std::string publish_topic, ros::NodeHandle &nh);

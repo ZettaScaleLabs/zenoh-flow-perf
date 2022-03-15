@@ -18,20 +18,22 @@
 #include <chrono>
 #include <thread>
 
+#define QUEUE_LENGTH 10
 
 using ato::ros_compute::Compute;
 
 Compute::Compute(const std::string listen_topic, const std::string publish_topic, ros::NodeHandle &nh) {
     this->nh = nh;
+    this->publish_topic = publish_topic;
+    this->listen_topic = listen_topic;
+    this->publisher = this->nh.advertise<eval_interfaces::Thr>(publish_topic, QUEUE_LENGTH);
+    this->subscriber = this->nh.subscribe(listen_topic, QUEUE_LENGTH, &Compute::receiver_callback, this);
 
-    this->publisher = this->nh.advertise<eval_interfaces::Thr>(publish_topic, 1024);
-    this->subscriber = this->nh.subscribe(listen_topic, 1000, &Compute::receiver_callback, this);
-
-    // ROS_INFO("Init Compute with listener: %s and subscriber %s", listen_topic, publish_topic);
+    ROS_INFO("Init Compute with listener: %s and subscriber %s", listen_topic.c_str(), publish_topic.c_str());
 }
 
 void Compute::publish_message(const eval_interfaces::Thr::ConstPtr& msg) {
-    this->publisher.publish(*msg);
+    this->publisher.publish(msg);
 }
 
 

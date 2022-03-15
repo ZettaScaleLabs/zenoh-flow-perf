@@ -60,6 +60,7 @@ CPUS="${CPUS:-0,1}"
 mkdir -p $OUT_DIR
 NICE="${NICE:--10}"
 ROS_MASTER_URI="${ROS_MASTER_URI:-http://127.0.0.1:11311}"
+ROS_IP="${ROS_IP:-127.0.0.1}"
 CYCLONEDDS_URI="${CYCLONEDDS_URI}"
 LISTEN="${LISTEN:-tcp/127.0.0.1:7447}"
 CONNECT="${LISTEN:-tcp/127.0.0.1:7887}"
@@ -75,6 +76,8 @@ TORUN=1
 
 plog "[ INIT ] Duration will be $DURATION seconds"
 plog "[ INIT ] Size for throughput test will be $SIZE"
+plog "[ INIT ] ROS_IP is $ROS_IP"
+
 while getopts "ioemzrR" arg; do
    case ${arg} in
    h)
@@ -181,6 +184,7 @@ while getopts "ioemzrR" arg; do
 
       source /opt/ros/noetic/setup.bash
       export ROS_MASTER_URI=$ROS_MASTER_URI
+      export ROS_IP="$ROS_IP"
 
       case ${TORUN} in
       1)

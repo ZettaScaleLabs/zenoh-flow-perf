@@ -18,7 +18,7 @@
 #include <chrono>
 #include <thread>
 
-#define QUEUE_LENGTH 10
+#define QUEUE_LENGTH 1
 
 using ato::ros_compute::Compute;
 

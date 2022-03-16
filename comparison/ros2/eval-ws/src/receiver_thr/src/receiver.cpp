@@ -41,7 +41,7 @@ void Receiver::print_stat(const uint64_t elapsed){
 
     if (msgs > 0) {
         // framework,scenario,test,pipeline,payload,rate,value,unit
-        std::cout << "ros2,multi,latency," << this->pipeline_length << "," << this->size << "," << msgs << "," << msgs << ",msgs" << std::endl << std::flush;
+        std::cout << "ros2,multi,throughput," << this->pipeline_length << "," << this->size << "," << msgs << "," << msgs << ",msgs" << std::endl << std::flush;
     }
 
 }

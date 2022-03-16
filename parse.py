@@ -11,12 +11,63 @@ import seaborn as sns
 import sys
 import argparse
 
-palette = 'bright' #sns.color_palette("bright", 6) #'plasma'
+
+palette = {
+    'zenoh-flow': 'tab:blue',
+    'ros': 'tab:green',
+    'ros2': 'tab:orange',
+}
+
+# palette = 'bright' #sns.color_palette("bright", 6) #'plasma'
 IMG_DIR = Path('img')
 
 def pairwise(data):
     l = iter(data)
     return zip(l,l)
+
+
+def bytes_label(n):
+    kmod = pow(2, 10)
+    kdiv = n / kmod
+    if kdiv < 1:
+        return "{}".format(n)
+
+    mmod = pow(2, 20)
+    mdiv = n / mmod
+    if mdiv < 1:
+        return "{0:.{c}f} KiB".format(kdiv, c=0 if n % kmod == 0 else 2)
+
+    gmod = pow(2, 30)
+    gdiv = n / gmod
+    if gdiv < 1:
+        return "{0:.{c}f} MiB".format(mdiv, c=0 if n % mmod == 0 else 2)
+
+    tmod = pow(2, 40)
+    tdiv = n / tmod
+    if tdiv < 1:
+        return "{0:.{c}f} GiB".format(gdiv, c=0 if n % gmod == 0 else 2)
+
+    pmod = pow(2, 50)
+    pdiv = n / pmod
+    if pdiv < 1:
+        return "{0:.{c}f} TiB".format(tdiv, c=0 if n % tmod == 0 else 2)
+
+    emod = pow(2, 60)
+    ediv = n / emod
+    if ediv < 1:
+        return "{0:.{c}f} PiB".format(pdiv, c=0 if n % pmod == 0 else 2)
+
+    zmod = pow(2, 70)
+    zdiv = n / zmod
+    if zdiv < 1:
+        return "{0:.{c}f} EiB".format(ediv, c=0 if n % emod == 0 else 2)
+
+    ymod = pow(2, 80)
+    ydiv = n / ymod
+    if ydiv < 1:
+        return "{0:.{c}f} ZiB".format(ediv, c=0 if n % zmod == 0 else 2)
+
+    return "{0:.{c}f} YiB".format(ydiv, c=0 if n % ymod == 0 else 2)
 
 def interval_label(n):
     if n == 0:
@@ -64,20 +115,36 @@ def mask_first_and_last(x):
     return mask
 
 
-def prepare(log_dir):
+def prepare(log_dir, kind):
     log = read_log(log_dir)
 
-    # Remove first and last two samples of every test
-    mask = log.groupby(['framework', 'scenario','test','pipeline','payload','rate']).transform(
-    mask_first_and_last)['value']
+    # filtering by kind of test
+    log = log[log['test']==kind]
+
+    # log['value'] = log['value'].astype(int, errors='ignore')
+    log['value'] = pd.to_numeric(log['value'], errors='coerce')
+
+    if kind == 'latency':
+        # Remove first and last two samples of every test
+        mask = log.groupby(['framework', 'scenario','test','pipeline','payload', 'rate']).transform(
+        mask_first_and_last)['value']
+    elif kind == 'throughput':
+        # Remove first and last two samples of every test
+        mask = log.groupby(['framework', 'scenario','test','pipeline','payload']).transform(
+        mask_first_and_last)['value']
     log = log.loc[mask]
 
-    # this converts everything to seconds, data is expected as micro seconds
-    log['value']= [ v/1000000 for v in log['value']] #TODO there is a unit field that should be used for the conversion
+    if kind == 'latency':
+        # this converts everything to seconds, data is expected as micro seconds
+        log['value']= [ v/1000000 for v in log['value']] #TODO there is a unit field that should be used for the conversion
+        log['label'] = [interval_label(v) for k, v in log['rate'].iteritems()]
+        log.sort_values(by='rate', inplace=True)
+    elif kind == 'throughput':
+        log['label'] = [bytes_label(v) for k, v in log['payload'].iteritems()]
+        log.sort_values(by='payload', inplace=True)
 
-    log.sort_values(by='rate', inplace=True)
+
     log['framework'] = log['framework'].astype(str)
-    log['label'] = [interval_label(v) for k, v in log['rate'].iteritems()]
 
     # adding count of samples
     log['counter'] = log.groupby(['framework', 'scenario','test','pipeline','payload','rate'])['framework'].cumcount().add(1)
@@ -168,7 +235,7 @@ def latency_ecfd_plot(log, scale, outfile):
     plt.xticks(rotation=72.5)
     plt.xlabel('Latency (seconds)')
 
-    # plt.legend(title='layer', loc='center left', bbox_to_anchor=(1.0, 0.5))
+    # plt.legend(title='Legend', loc='center left', bbox_to_anchor=(1.0, 0.5))
 
     # ticker = mpl.ticker.EngFormatter(unit='')
     # axes.yaxis.set_major_formatter(ticker)
@@ -193,7 +260,7 @@ def latency_pdf_plot(log, scale, outfile):
     plt.xticks(rotation=72.5)
     plt.xlabel('Latency (seconds)')
 
-    # plt.legend(title='layer', loc='center left', bbox_to_anchor=(1.0, 0.5))
+    # plt.legend(title='Legend', loc='center left', bbox_to_anchor=(1.0, 0.5))
 
     # ticker = mpl.ticker.EngFormatter(unit='')
     # axes.yaxis.set_major_formatter(ticker)
@@ -220,7 +287,7 @@ def latency_stat_plot(log, scale, outfile):
     plt.xlabel('Messages per seconds (msg/s)')
 
     plt.ylabel('Latency (seconds)')
-    plt.legend(title='Framework', loc='center left', bbox_to_anchor=(1.0, 0.5))
+    plt.legend(title='Legend', loc='center left', bbox_to_anchor=(1.0, 0.5))
 
     ticker = mpl.ticker.EngFormatter(unit='')
     axes.yaxis.set_major_formatter(ticker)
@@ -228,6 +295,32 @@ def latency_stat_plot(log, scale, outfile):
     plt.tight_layout()
     fig.savefig(IMG_DIR.joinpath(outfile))
 
+
+def throughput_stat_plot(log, scale, outfile):
+
+    fig, axes = plt.subplots()
+
+    g = sns.lineplot(data=log, x='label', y='value', palette=palette,
+                ci=95, err_style='band', hue='framework',
+                estimator=np.median, style='pipeline')
+
+    if scale == 'log':
+        g.set_yscale('log')
+
+    plt.grid(which='major', color='grey', linestyle='-', linewidth=0.1)
+    plt.grid(which='minor', color='grey', linestyle=':', linewidth=0.1, axis='y')
+
+    plt.xticks(rotation=72.5)
+    plt.xlabel('Payload size (bytes)')
+
+    plt.ylabel('Messages per second (msg/s)')
+    plt.legend(title='Legend', loc='center left', bbox_to_anchor=(1.0, 0.5))
+
+    ticker = mpl.ticker.EngFormatter(unit='')
+    axes.yaxis.set_major_formatter(ticker)
+
+    plt.tight_layout()
+    fig.savefig(IMG_DIR.joinpath(outfile))
 
 def latency_time_plot(log, scale, outfile):
 
@@ -258,7 +351,7 @@ def latency_time_plot(log, scale, outfile):
     plt.xlabel('Index')
 
     plt.ylabel('Latency (seconds)')
-    plt.legend(title='Framework', loc='center left', bbox_to_anchor=(1.0, 0.5))
+    plt.legend(title='Legend', loc='center left', bbox_to_anchor=(1.0, 0.5))
 
 
     ticker = mpl.ticker.EngFormatter(unit='')
@@ -291,7 +384,7 @@ def main():
     if not os.path.exists(IMG_DIR):
         os.makedirs(IMG_DIR)
 
-    log = prepare(args['data'])
+    log = prepare(args['data'], args['kind'])
     print(f'[ STEP1 ] Read a total of {log.size} samples')
     log = filter(log, args['process'], args.get('msgs', None), args.get('length', None))
     print(f'[ STEP2 ] After filtering we have {log.size} samples')
@@ -321,6 +414,18 @@ def main():
             latency_ecfd_plot(log, args['scale'], args['output'])
         elif args['type'] == 'pdf':
             latency_pdf_plot(log, args['scale'], args['output'])
+    elif args['kind'] == 'throughput':
+        if args['type'] == 'stat':
+            throughput_stat_plot(log, args['scale'], args['output'])
+        elif args['type'] == 'time':
+            print('Not implemented.')
+            # latency_time_plot(log, args['scale'], args['output'])
+        elif args['type'] == 'ecdf':
+            print('Not implemented.')
+            # latency_ecfd_plot(log, args['scale'], args['output'])
+        elif args['type'] == 'pdf':
+            print('Not implemented.')
+            # latency_pdf_plot(log, args['scale'], args['output'])
 
     out = IMG_DIR.joinpath(args['output'])
     print(f'[  DONE ] File saved to { out }')
@@ -330,52 +435,3 @@ def main():
 
 if __name__=='__main__':
     main()
-
-
-
-# fig, axes = plt.subplots()
-# g = sns.lineplot(data=log, x='label', y='latency', palette=palette,
-#             #ci='sd', err_style='band', estimator="median",
-#             hue='layer', style='pipeline')
-
-# #g.set_xticklabels(log['messages'].unique())
-# plt.grid(which='major', color='grey', linestyle='-', linewidth=0.1)
-# plt.grid(which='minor', color='grey', linestyle=':', linewidth=0.1, axis='y')
-
-# plt.xticks(rotation=72.5)
-# plt.xlabel('Messages per seconds (msg/s)')
-
-# plt.ylabel('Latency (seconds)')
-# plt.legend(title='Layer', loc='center left', bbox_to_anchor=(1.0, 0.5))
-
-# #plt.yticks([pow(10, -5)] + [i*pow(10, -5)  for i in range(2, 41, 2)] + [i*pow(10, -4) for i in range(2, 41, 2)], fontsize=4)
-
-# ticker = mpl.ticker.EngFormatter(unit='')
-# axes.yaxis.set_major_formatter(ticker)
-
-# plt.tight_layout()
-# #plt.show()
-# fig.savefig(img_dir.joinpath('latency-all-linear.pdf'))
-
-# ALL throughput
-# fig, axes = plt.subplots()
-
-# g = sns.lineplot(data=log, x='label', y='throughput', estimator="median",
-#              ci='sd', err_style='band', palette=palette,
-#              hue='layer')
-# g.set_yscale('log')
-
-# plt.grid(which='major', color='grey', linestyle='-', linewidth=0.1)
-# plt.grid(which='minor', color='grey', linestyle=':', linewidth=0.1, axis='y')
-
-# plt.xticks(rotation=72.5)
-# plt.xlabel('Payload size (Bytes)')
-
-# plt.ylabel('bit/s')
-# plt.legend(title='Layer')
-# ticker = mpl.ticker.EngFormatter(unit='')
-# axes.yaxis.set_major_formatter(ticker)
-
-# plt.tight_layout()
-# #plt.show()
-# fig.savefig(img_dir.joinpath('zenoh-flow-thr-all.pdf'))

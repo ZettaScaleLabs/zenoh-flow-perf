@@ -35,7 +35,7 @@ class MyState:
             self.interval = 1/int(configuration['msgs'])
         if configuration['size'] is not None:
             self.size = int(configuration['size'])
-        self.payload = [0] * self.size
+        self.payload = b'0' * self.size
         self.key_expr = '/test/latency/zf/pong'
         self.zenoh = zenoh.open(None)
         self.sub = self.zenoh.subscribe(self.key_expr, zlistener)
@@ -62,7 +62,7 @@ class MySrc(Source):
         else:
             state.first = False
 
-        return int_to_bytes(time.time_ns())
+        return int_to_bytes(time.time_ns()) + state.payload
 
 
 

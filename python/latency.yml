@@ -1,5 +1,13 @@
 flow: PythonLatency
-operators: []
+operators:
+  - id : NoOp
+    uri: file:///home/gabri/Workspace/zenoh-flow-perf/python//noop.py
+    inputs:
+      - id: Data
+        type: lat
+    outputs:
+      - id: Data
+        type: lat
 sources:
   - id : Ping
     uri: file:///home/gabri/Workspace/zenoh-flow-perf/python/ping-src.py
@@ -8,7 +16,7 @@ sources:
       size: 6000000
     output:
         id: Ping
-        type: u64
+        type: lat
 sinks:
   - id : Pong
     uri: file:///home/gabri/Workspace/zenoh-flow-perf/python/pong-sink.py
@@ -17,11 +25,17 @@ sinks:
       size: 6000000
     input:
         id: Pong
-        type: u64
+        type: lat
 links:
 - from:
     node : Ping
     output : Ping
+  to:
+    node : NoOp
+    input : Data
+- from:
+    node : NoOp
+    output : Data
   to:
     node : Pong
     input : Pong

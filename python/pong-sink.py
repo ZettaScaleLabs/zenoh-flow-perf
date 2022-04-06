@@ -21,9 +21,11 @@ from zenoh_flow import Sink
 class MyState:
     def __init__(self, configuration):
         self.interval = 1
+        self.msgs = 1
         self.size = 64
         if configuration['msgs'] is not None:
             self.interval = 1/int(configuration['msgs'])
+            self.msgs = int(configuration['msgs'])
         if configuration['size'] is not None:
             self.size = int(configuration['size'])
         self.key_expr = '/test/latency/zf/pong'
@@ -41,10 +43,11 @@ class MySrc(Sink):
 
     def run(self, _ctx, state, data):
         now = time.time_ns()
-        value = bytes_to_int(data.data)
+        ts_value = data.data[:8]
+        value = bytes_to_int(ts_value)
         elapsed = now - value
 
-        print(f'zenoh-flow-python,single,latency,1,{state.size},0,{elapsed},ns')
+        print(f'zenoh-flow-python,{state.size},{state.msgs},{elapsed},ns')
 
         state.zenoh.put(state.key_expr, int_to_bytes(now))
 

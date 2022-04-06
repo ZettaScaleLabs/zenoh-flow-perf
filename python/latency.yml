@@ -1,0 +1,27 @@
+flow: PythonLatency
+operators: []
+sources:
+  - id : Ping
+    uri: file:///home/gabri/Workspace/zenoh-flow-perf/python/ping-src.py
+    configuration:
+      msgs: 60
+      size: 6000000
+    output:
+        id: Ping
+        type: u64
+sinks:
+  - id : Pong
+    uri: file:///home/gabri/Workspace/zenoh-flow-perf/python/pong-sink.py
+    configuration:
+      msgs: 60
+      size: 6000000
+    input:
+        id: Pong
+        type: u64
+links:
+- from:
+    node : Ping
+    output : Ping
+  to:
+    node : Pong
+    input : Pong

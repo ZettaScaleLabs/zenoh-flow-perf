@@ -1,0 +1,6 @@
+[workspace]
+
+members = [
+    "latency",
+    "throughput",
+]

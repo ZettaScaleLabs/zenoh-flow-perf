@@ -36,8 +36,7 @@ fn noop(input: Vec<u8>, hlc: Arc<HLC>) -> Vec<u8> {
         Message::Data(mut data) => {
             let inner_data = data.get_inner_data().clone();
             let zf_msg = Message::from_serdedata(inner_data, hlc.new_timestamp(), vec![], vec![]);
-            let serialized_zf = zf_msg.serialize_bincode().unwrap();
-            return serialized_zf;
+            zf_msg.serialize_bincode().unwrap()
         }
         _ => panic!("Should never enter here!"),
     }
@@ -48,7 +47,7 @@ fn pipeline(size: u64, input: Vec<u8>, hlc: Arc<HLC>) -> Vec<u8> {
     for _ in 0..size {
         in_data = noop(in_data, hlc.clone());
     }
-    return in_data;
+    in_data
 }
 
 #[async_std::main]
@@ -73,17 +72,14 @@ async fn main() {
 
         // let deserialized_zf : Message = bincode::deserialize(&serialized_zf).unwrap();
 
-        match deserialized_zf {
-            Message::Data(mut data) => {
-                let de_msg = data.get_inner_data().try_get::<Latency>().unwrap();
-                let now = get_epoch_us();
-                let elapsed = now - de_msg.ts;
-                println!(
-                    "serde,scenario,latency,pipeline,{},{},{}",
-                    args.msgs, args.pipeline, elapsed
-                );
-            }
-            _ => (),
+        if let Message::Data(mut data) = deserialized_zf {
+            let de_msg = data.get_inner_data().try_get::<Latency>().unwrap();
+            let now = get_epoch_us();
+            let elapsed = now - de_msg.ts;
+            println!(
+                "serde,scenario,latency,pipeline,{},{},{}",
+                args.msgs, args.pipeline, elapsed
+            );
         }
     }
 }

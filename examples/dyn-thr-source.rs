@@ -15,7 +15,7 @@
 use zenoh_flow::async_std::sync::Arc;
 use zenoh_flow::Source;
 use zenoh_flow::{export_source, types::ZFResult};
-use zenoh_flow_perf::operators::ThrSource;
+use zenoh_flow_perf::nodes::ThrSource;
 
 export_source!(register);
 

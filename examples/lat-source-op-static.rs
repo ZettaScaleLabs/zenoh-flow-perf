@@ -19,7 +19,7 @@ use zenoh_flow::runtime::dataflow::instance::DataflowInstance;
 use zenoh_flow::runtime::dataflow::loader::{Loader, LoaderConfig};
 use zenoh_flow::runtime::RuntimeContext;
 use zenoh_flow::{model::link::PortDescriptor, Node};
-use zenoh_flow_perf::operators::{LatSource, NoOpPrint, LAT_PORT};
+use zenoh_flow_perf::nodes::{LatSource, NoOpPrint, LAT_PORT};
 
 static DEFAULT_PIPELINE: &str = "1";
 static DEFAULT_MSGS: &str = "1";
@@ -77,7 +77,7 @@ async fn main() {
 
     zf_graph
         .try_add_static_operator(
-            format!("noop").into(),
+            "noop".into(),
             vec![PortDescriptor {
                 port_id: String::from(LAT_PORT).into(),
                 port_type: String::from("lat").into(),
@@ -97,7 +97,7 @@ async fn main() {
                 output: String::from(LAT_PORT).into(),
             },
             InputDescriptor {
-                node: format!("noop").into(),
+                node: "noop".into(),
                 input: String::from(LAT_PORT).into(),
             },
             None,
@@ -105,7 +105,7 @@ async fn main() {
             None,
         )
         .unwrap();
-    pipe.push_str(format!("lat-source-->noop").as_str());
+    pipe.push_str("lat-source-->noop");
 
     // println!("Pipeline is: {pipe}");
 

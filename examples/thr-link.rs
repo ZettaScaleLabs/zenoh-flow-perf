@@ -47,8 +47,8 @@ async fn main() {
     // println!("layer,scenario,test,name,size,messages");
 
     let c = count.clone();
-    let i = args.interveal.clone();
-    let s = args.size.clone();
+    let i = args.interveal;
+    let s = args.size;
     task::spawn(async move {
         loop {
             task::sleep(Duration::from_secs(i)).await;

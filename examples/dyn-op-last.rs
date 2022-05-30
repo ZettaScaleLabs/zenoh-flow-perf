@@ -14,7 +14,7 @@
 
 use zenoh_flow::async_std::sync::Arc;
 use zenoh_flow::{export_operator, types::ZFResult, Operator};
-use zenoh_flow_perf::operators::IRNoOp;
+use zenoh_flow_perf::nodes::IRNoOp;
 
 export_operator!(register);
 

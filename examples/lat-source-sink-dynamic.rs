@@ -13,17 +13,19 @@
 //
 
 use clap::Parser;
+use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::fs::{File, *};
 use std::io::Write;
 use std::path::Path;
 use zenoh_flow::async_std::sync::Arc;
-use zenoh_flow::model::dataflow::descriptor::{DataFlowDescriptor, Mapping};
+use zenoh_flow::model::dataflow::descriptor::DataFlowDescriptor;
 use zenoh_flow::model::link::{LinkDescriptor, PortDescriptor};
 use zenoh_flow::model::node::{SinkDescriptor, SourceDescriptor};
 use zenoh_flow::model::{InputDescriptor, OutputDescriptor};
 use zenoh_flow::runtime::dataflow::loader::{Loader, LoaderConfig};
 use zenoh_flow::runtime::RuntimeContext;
+use zenoh_flow::{NodeId, RuntimeId};
 
 static DEFAULT_PIPELINE: &str = "1";
 static DEFAULT_MSGS: &str = "1";
@@ -137,7 +139,7 @@ async fn main() {
     // Creating the descriptor
 
     let mut dfd = DataFlowDescriptor {
-        flow: format!("pipeline-source-sink"),
+        flow: "pipeline-source-sink".into(),
         operators: vec![],
         sources: vec![],
         sinks: vec![],
@@ -145,6 +147,8 @@ async fn main() {
         mapping: None,
         deadlines: None,
         loops: None,
+        global_configuration: None,
+        flags: None,
     };
 
     // Source
@@ -170,7 +174,7 @@ async fn main() {
             port_type: "latency".into(),
         },
         uri: Some(String::from(SNK_URI)),
-        configuration: config.clone(),
+        configuration: config,
         runtime: None,
     };
 
@@ -186,7 +190,7 @@ async fn main() {
             output: PORT.into(),
         },
         to: InputDescriptor {
-            node: format!("sink").into(),
+            node: "sink".into(),
             input: PORT.into(),
         },
         size: None,
@@ -196,19 +200,10 @@ async fn main() {
 
     dfd.links.push(source_sink_link);
 
-    // Creating static mapping
-
-    // Source mapping
-    dfd.add_mapping(Mapping {
-        id: "source".into(),
-        runtime: "src".into(),
-    });
-
-    // Sink mapping
-    dfd.add_mapping(Mapping {
-        id: "sink".into(),
-        runtime: "snk".into(),
-    });
+    let mut mapping: HashMap<NodeId, RuntimeId> = HashMap::with_capacity(2);
+    mapping.insert("source".into(), "src".into());
+    mapping.insert("sink".into(), "snk".into());
+    dfd.mapping = Some(mapping);
 
     let yaml_descriptor = dfd.to_yaml().unwrap();
     println!("Descriptor:\n{yaml_descriptor}");

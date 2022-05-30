@@ -79,23 +79,20 @@ async fn pong(session: zenoh::Session, msgs: u64, pipeline: u64, udp: bool) {
         let now = get_epoch_us();
         let de: Message = bincode::deserialize(&msg.value.payload.contiguous()).unwrap();
 
-        match de {
-            Message::Data(mut data_msg) => {
-                let data = data_msg.get_inner_data().try_get::<Latency>().unwrap();
-                let elapsed = now - data.ts;
+        if let Message::Data(mut data_msg) = de {
+            let data = data_msg.get_inner_data().try_get::<Latency>().unwrap();
+            let elapsed = now - data.ts;
 
-                // framework,scenario,test,pipeline,payload,rate,value,unit
-                println!("{layer},multi,latency,{pipeline},8,{msgs},{elapsed},us");
+            // framework,scenario,test,pipeline,payload,rate,value,unit
+            println!("{layer},multi,latency,{pipeline},8,{msgs},{elapsed},us");
 
-                io::stdout().flush().unwrap();
+            io::stdout().flush().unwrap();
 
-                session
-                    .put(&key_expr_pong, pong_data.clone())
-                    .congestion_control(CongestionControl::Block)
-                    .await
-                    .unwrap();
-            }
-            _ => (),
+            session
+                .put(&key_expr_pong, pong_data.clone())
+                .congestion_control(CongestionControl::Block)
+                .await
+                .unwrap();
         }
     }
 }

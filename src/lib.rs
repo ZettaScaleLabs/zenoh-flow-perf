@@ -20,7 +20,7 @@ use zenoh_flow::serde::{Deserialize, Serialize};
 use zenoh_flow::zenoh_flow_derive::ZFData;
 use zenoh_flow::{Deserializable, ZFData, ZFError, ZFResult};
 
-pub mod operators;
+pub mod nodes;
 pub mod runtime;
 
 pub fn write_string_to_file(content: String, filename: &str) {

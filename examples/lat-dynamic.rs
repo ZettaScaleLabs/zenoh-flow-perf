@@ -12,11 +12,14 @@
 //   ZettaScale zenoh team, <zenoh@zettascale.tech>
 //
 
+use std::collections::HashMap;
+
 use clap::Parser;
-use zenoh_flow::model::dataflow::descriptor::{DataFlowDescriptor, Mapping};
+use zenoh_flow::model::dataflow::descriptor::DataFlowDescriptor;
 use zenoh_flow::model::link::{LinkDescriptor, PortDescriptor};
 use zenoh_flow::model::node::{OperatorDescriptor, SinkDescriptor, SourceDescriptor};
 use zenoh_flow::model::{InputDescriptor, OutputDescriptor};
+use zenoh_flow::{NodeId, RuntimeId};
 
 static DEFAULT_PIPELINE: &str = "1";
 static DEFAULT_MSGS: &str = "1";
@@ -75,6 +78,7 @@ async fn main() {
 
     // Creating the descriptor
 
+    let mut mapping: HashMap<NodeId, RuntimeId> = HashMap::new();
     let mut dfd = DataFlowDescriptor {
         flow: format!("pipeline{}", args.pipeline),
         operators: vec![],
@@ -84,6 +88,8 @@ async fn main() {
         mapping: None,
         deadlines: None,
         loops: None,
+        global_configuration: None,
+        flags: None,
     };
 
     // Source and Sink
@@ -108,7 +114,7 @@ async fn main() {
                     port_type: "latency".into(),
                 },
                 uri: Some(String::from(PONG_SNK_URI)),
-                configuration: config.clone(),
+                configuration: config,
                 runtime: None,
             };
             (src, snk)
@@ -132,7 +138,7 @@ async fn main() {
                     port_type: "latency".into(),
                 },
                 uri: Some(String::from(SNK_URI)),
-                configuration: config.clone(),
+                configuration: config,
                 runtime: None,
             };
             (src, snk)
@@ -172,7 +178,7 @@ async fn main() {
             output: PORT.into(),
         },
         to: InputDescriptor {
-            node: format!("op-0").into(),
+            node: "op-0".into(),
             input: PORT.into(),
         },
         size: None,
@@ -223,26 +229,13 @@ async fn main() {
     dfd.links.push(opn_sink_link);
 
     // Creating static mapping
-
-    // Source mapping
-    dfd.add_mapping(Mapping {
-        id: "source".into(),
-        runtime: "src".into(),
-    });
-
-    // Sink mapping
-    dfd.add_mapping(Mapping {
-        id: "sink".into(),
-        runtime: "snk".into(),
-    });
-
-    // Operators
+    mapping.insert("source".into(), "src".into());
+    mapping.insert("sink".into(), "snk".into());
     for i in 0..args.pipeline {
-        dfd.add_mapping(Mapping {
-            id: format!("op-{i}").into(),
-            runtime: format!("comp{i}").into(),
-        });
+        mapping.insert(format!("op-{i}").into(), format!("comp{i}").into());
     }
+
+    dfd.mapping = Some(mapping);
 
     let yaml_descriptor = dfd.to_yaml().unwrap();
     println!("Descriptor:\n{yaml_descriptor}");

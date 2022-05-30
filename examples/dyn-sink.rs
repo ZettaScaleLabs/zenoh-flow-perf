@@ -14,7 +14,7 @@
 
 use zenoh_flow::async_std::sync::Arc;
 use zenoh_flow::{export_sink, types::ZFResult, Sink};
-use zenoh_flow_perf::operators::LatSink;
+use zenoh_flow_perf::nodes::LatSink;
 
 export_sink!(register);
 

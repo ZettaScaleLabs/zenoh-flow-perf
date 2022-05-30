@@ -13,12 +13,13 @@
 //
 
 use clap::Parser;
+use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::fs::{File, *};
 use std::io::Write;
 use std::path::Path;
 use zenoh_flow::async_std::sync::Arc;
-use zenoh_flow::model::dataflow::descriptor::{DataFlowDescriptor, Mapping};
+use zenoh_flow::model::dataflow::descriptor::DataFlowDescriptor;
 use zenoh_flow::model::link::{LinkDescriptor, PortDescriptor};
 use zenoh_flow::model::node::{OperatorDescriptor, SinkDescriptor, SourceDescriptor};
 use zenoh_flow::model::{InputDescriptor, OutputDescriptor};
@@ -138,7 +139,7 @@ async fn main() {
     // Creating the descriptor
 
     let mut dfd = DataFlowDescriptor {
-        flow: format!("pipeline-source-op"),
+        flow: "pipeline-source-op".into(),
         operators: vec![],
         sources: vec![],
         sinks: vec![],
@@ -146,6 +147,8 @@ async fn main() {
         mapping: None,
         deadlines: None,
         loops: None,
+        global_configuration: None,
+        flags: None,
     };
 
     // Source
@@ -182,7 +185,7 @@ async fn main() {
     // Creating and adding operators to descriptors
 
     let op_descriptor = OperatorDescriptor {
-        id: format!("op").into(),
+        id: "op".into(),
         inputs: vec![PortDescriptor {
             port_id: PORT.into(),
             port_type: "latency".into(),
@@ -192,7 +195,7 @@ async fn main() {
             port_type: "latency".into(),
         }],
         uri: Some(String::from(NOOP_URI)),
-        configuration: config.clone(),
+        configuration: config,
         runtime: None,
         deadline: None,
     };
@@ -206,7 +209,7 @@ async fn main() {
             output: PORT.into(),
         },
         to: InputDescriptor {
-            node: format!("op").into(),
+            node: "op".into(),
             input: PORT.into(),
         },
         size: None,
@@ -222,7 +225,7 @@ async fn main() {
 
     let opn_sink_link = LinkDescriptor {
         from: OutputDescriptor {
-            node: format!("op").into(),
+            node: "op".into(),
             output: PORT.into(),
         },
         to: InputDescriptor {
@@ -237,24 +240,11 @@ async fn main() {
     dfd.links.push(opn_sink_link);
 
     // Creating static mapping
-
-    // Source mapping
-    dfd.add_mapping(Mapping {
-        id: "source".into(),
-        runtime: "src".into(),
-    });
-
-    // Sink mapping
-    dfd.add_mapping(Mapping {
-        id: "sink".into(),
-        runtime: "snk".into(),
-    });
-
-    // Operator
-    dfd.add_mapping(Mapping {
-        id: format!("op").into(),
-        runtime: format!("comp").into(),
-    });
+    let mut mapping = HashMap::new();
+    mapping.insert("source".into(), "src".into());
+    mapping.insert("sink".into(), "snk".into());
+    mapping.insert("op".into(), "comp".into());
+    dfd.mapping = Some(mapping);
 
     let yaml_descriptor = dfd.to_yaml().unwrap();
     println!("Descriptor:\n{yaml_descriptor}");

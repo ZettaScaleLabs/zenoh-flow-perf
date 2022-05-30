@@ -239,7 +239,7 @@ impl Node for ScalPingSource {
             }
         } else {
             let key_expr_pong = session
-                .declare_expr(format!("/test/latency/zf/pong/0"))
+                .declare_expr("/test/latency/zf/pong/0")
                 .wait()
                 .unwrap();
             let sub = session.subscribe(key_expr_pong).wait().unwrap();

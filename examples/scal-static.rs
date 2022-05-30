@@ -23,7 +23,7 @@ use zenoh_flow::runtime::dataflow::instance::DataflowInstance;
 use zenoh_flow::runtime::dataflow::loader::{Loader, LoaderConfig};
 use zenoh_flow::runtime::RuntimeContext;
 use zenoh_flow::Node;
-use zenoh_flow_perf::operators::{IRNoOp, NoOp, ScalPingSource, ScalPongSink, LAT_PORT};
+use zenoh_flow_perf::nodes::{IRNoOp, NoOp, ScalPingSource, ScalPongSink, LAT_PORT};
 
 static DEFAULT_FACTOR: &str = "0";
 static DEFAULT_FANKIND: &str = "in";
@@ -33,18 +33,18 @@ type ParseError = &'static str;
 
 #[derive(Parser, Debug)]
 enum FanKind {
-    FanIn,
-    FanOut,
-    FanOutFanIn,
+    In,
+    Out,
+    OutIn,
 }
 
 impl FromStr for FanKind {
     type Err = ParseError;
     fn from_str(fan: &str) -> Result<Self, Self::Err> {
         match fan {
-            "in" => Ok(FanKind::FanIn),
-            "out" => Ok(FanKind::FanOut),
-            "outin" => Ok(FanKind::FanOutFanIn),
+            "in" => Ok(FanKind::In),
+            "out" => Ok(FanKind::Out),
+            "outin" => Ok(FanKind::OutIn),
             _ => Err("Could not parse kind"),
         }
     }
@@ -70,10 +70,10 @@ async fn main() {
     let total_nodes: u64 = 1 << args.factor;
 
     let config = match args.kind {
-        FanKind::FanIn => Some(
+        FanKind::In => Some(
             serde_json::json!({"interval" : interval, "nodes": total_nodes, "inputs": total_nodes, "msgs": args.msgs, "mode": 1, "multi":false}),
         ),
-        FanKind::FanOut | FanKind::FanOutFanIn => Some(
+        FanKind::Out | FanKind::OutIn => Some(
             serde_json::json!({"interval" : interval, "nodes": total_nodes, "inputs": total_nodes, "msgs": args.msgs, "mode": 2, "multi":false}),
         ),
     };
@@ -109,11 +109,11 @@ async fn main() {
         .unwrap();
 
     match args.kind {
-        FanKind::FanIn => {
+        FanKind::In => {
             let sink = Arc::new(ScalPongSink {});
             let mut id_hm: HashMap<String, Value> = HashMap::new();
             id_hm.insert("id".to_string(), Value::Number(0.into()));
-            let sink_config = Some(zenoh_flow_perf::operators::dict_merge(
+            let sink_config = Some(zenoh_flow_perf::nodes::dict_merge(
                 &config.clone().unwrap(),
                 &id_hm,
             ));
@@ -167,7 +167,7 @@ async fn main() {
 
             zf_graph
                 .try_add_static_operator(
-                    format!("op-last").into(),
+                    "op-last".into(),
                     inputs,
                     vec![PortDescriptor {
                         port_id: String::from(LAT_PORT).into(),
@@ -234,7 +234,7 @@ async fn main() {
                     .unwrap();
             }
         }
-        FanKind::FanOut => {
+        FanKind::Out => {
             // Creating operators
             for i in 0..total_nodes {
                 let op = Arc::new(NoOp {});
@@ -261,7 +261,7 @@ async fn main() {
             for i in 0..total_nodes {
                 let mut id_hm: HashMap<String, Value> = HashMap::new();
                 id_hm.insert("id".to_string(), i.into());
-                let sink_config = Some(zenoh_flow_perf::operators::dict_merge(
+                let sink_config = Some(zenoh_flow_perf::nodes::dict_merge(
                     &config.clone().unwrap(),
                     &id_hm,
                 ));

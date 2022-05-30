@@ -1,4 +1,4 @@
-use crate::operators::{LAT_PORT, THR_PORT};
+use crate::nodes::{LAT_PORT, THR_PORT};
 use crate::{get_epoch_us, Latency};
 
 use std::collections::HashMap;
@@ -241,7 +241,7 @@ impl Operator for IRNoOp {
 
         // let real_state = state.try_get::<LastOpState>()?;
         let data = inputs
-            .get_mut("Data0".into())
+            .get_mut("Data0")
             .unwrap()
             .get_inner_data()
             .try_get::<Latency>()?;

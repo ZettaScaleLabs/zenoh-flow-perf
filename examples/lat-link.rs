@@ -43,8 +43,8 @@ async fn main() {
         link::<Latency>(None, send_id.clone().into(), recv_id.clone().into());
     let (sender_pong, receiver_pong) = link::<()>(None, recv_id.into(), send_id.into());
 
-    let c_msgs = args.msgs.clone();
-    let pipeline_msgs = args.pipeline.clone();
+    let c_msgs = args.msgs;
+    let pipeline_msgs = args.pipeline;
     task::spawn(async move {
         while let Ok((_, data)) = receiver_ping.recv().await {
             let now = get_epoch_us();

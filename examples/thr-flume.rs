@@ -44,8 +44,8 @@ async fn main() {
     // println!("layer,scenario,test,name,size,messages");
 
     let c = count.clone();
-    let i = args.interveal.clone();
-    let s = args.size.clone();
+    let i = args.interveal;
+    let s = args.size;
     task::spawn(async move {
         loop {
             task::sleep(Duration::from_secs(i)).await;
@@ -56,7 +56,7 @@ async fn main() {
     });
 
     task::spawn(async move {
-        while let Ok(_) = receiver.recv_async().await {
+        while (receiver.recv_async().await).is_ok() {
             count.fetch_add(1, Ordering::AcqRel);
         }
     });

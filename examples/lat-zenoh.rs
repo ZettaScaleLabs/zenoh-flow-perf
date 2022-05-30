@@ -79,15 +79,12 @@ async fn subscriber(session: zenoh::Session, msgs: u64, pipeline: u64, udp: bool
         let now = get_epoch_us();
         let de: Message = bincode::deserialize(&msg.value.payload.contiguous()).unwrap();
 
-        match de {
-            Message::Data(mut data_msg) => {
-                let data = data_msg.get_inner_data().try_get::<Latency>().unwrap();
-                let elapsed = now - data.ts;
+        if let Message::Data(mut data_msg) = de {
+            let data = data_msg.get_inner_data().try_get::<Latency>().unwrap();
+            let elapsed = now - data.ts;
 
-                // layer,scenario name,test kind, test name, payload size, msg/s, pipeline size, latency, unit
-                println!("{layer},scenario,latency,pipeline,{msgs},{pipeline},{elapsed},us");
-            }
-            _ => (),
+            // layer,scenario name,test kind, test name, payload size, msg/s, pipeline size, latency, unit
+            println!("{layer},scenario,latency,pipeline,{msgs},{pipeline},{elapsed},us");
         }
     }
 }

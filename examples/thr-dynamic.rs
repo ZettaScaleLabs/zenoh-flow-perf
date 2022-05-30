@@ -12,8 +12,10 @@
 //   ZettaScale zenoh team, <zenoh@zettascale.tech>
 //
 
+use std::collections::HashMap;
+
 use clap::Parser;
-use zenoh_flow::model::dataflow::descriptor::{DataFlowDescriptor, Mapping};
+use zenoh_flow::model::dataflow::descriptor::DataFlowDescriptor;
 use zenoh_flow::model::link::{LinkDescriptor, PortDescriptor};
 use zenoh_flow::model::node::{OperatorDescriptor, SinkDescriptor, SourceDescriptor};
 use zenoh_flow::model::{InputDescriptor, OutputDescriptor};
@@ -26,7 +28,6 @@ static DEFAULT_RT_DESCRIPTOR: &str = "./descriptor.yaml";
 static NOOP_URI: &str = "file://./target/release/examples/libdyn_noop.so";
 static SRC_URI: &str = "file://./target/release/examples/libdyn_thr_source.so";
 static SNK_URI: &str = "file://./target/release/examples/libdyn_thr_sink.so";
-
 
 static PORT: &str = "Data";
 
@@ -78,33 +79,35 @@ async fn main() {
         mapping: None,
         deadlines: None,
         loops: None,
+        global_configuration: None,
+        flags: None,
     };
 
     // Source and Sink
 
     let (source_descriptor, sink_descriptor) = {
-            let src = SourceDescriptor {
-                id: "source".into(),
-                period: None,
-                output: PortDescriptor {
-                    port_id: PORT.into(),
-                    port_type: "data".into(),
-                },
-                uri: Some(String::from(SRC_URI)),
-                configuration: config.clone(),
-                runtime: None,
-            };
-            let snk = SinkDescriptor {
-                id: "sink".into(),
-                input: PortDescriptor {
-                    port_id: PORT.into(),
-                    port_type: "data".into(),
-                },
-                uri: Some(String::from(SNK_URI)),
-                configuration: config.clone(),
-                runtime: None,
-            };
-            (src, snk)
+        let src = SourceDescriptor {
+            id: "source".into(),
+            period: None,
+            output: PortDescriptor {
+                port_id: PORT.into(),
+                port_type: "data".into(),
+            },
+            uri: Some(String::from(SRC_URI)),
+            configuration: config.clone(),
+            runtime: None,
+        };
+        let snk = SinkDescriptor {
+            id: "sink".into(),
+            input: PortDescriptor {
+                port_id: PORT.into(),
+                port_type: "data".into(),
+            },
+            uri: Some(String::from(SNK_URI)),
+            configuration: config,
+            runtime: None,
+        };
+        (src, snk)
     };
 
     // Adding source and sinks to descriptor
@@ -140,7 +143,7 @@ async fn main() {
             output: PORT.into(),
         },
         to: InputDescriptor {
-            node: format!("op-0").into(),
+            node: "op-0".into(),
             input: PORT.into(),
         },
         size: None,
@@ -190,27 +193,13 @@ async fn main() {
 
     dfd.links.push(opn_sink_link);
 
-    // Creating static mapping
-
-    // Source mapping
-    dfd.add_mapping(Mapping {
-        id: "source".into(),
-        runtime: "src".into(),
-    });
-
-    // Sink mapping
-    dfd.add_mapping(Mapping {
-        id: "sink".into(),
-        runtime: "snk".into(),
-    });
-
-    // Operators
+    let mut mapping = HashMap::new();
+    mapping.insert("source".into(), "src".into());
+    mapping.insert("sink".into(), "snk".into());
     for i in 0..args.pipeline {
-        dfd.add_mapping(Mapping {
-            id: format!("op-{i}").into(),
-            runtime: format!("comp{i}").into(),
-        });
+        mapping.insert(format!("op-{i}").into(), format!("comp{i}").into());
     }
+    dfd.mapping = Some(mapping);
 
     let yaml_descriptor = dfd.to_yaml().unwrap();
     // println!("Descriptor:\n{yaml_descriptor}");

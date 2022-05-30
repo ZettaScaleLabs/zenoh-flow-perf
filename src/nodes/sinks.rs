@@ -240,7 +240,7 @@ impl Node for ThrSink {
         let accumulator = Arc::new(AtomicUsize::new(0usize));
 
         let loop_accumulator = Arc::clone(&accumulator);
-        let loop_payload_size = payload_size.clone();
+        let loop_payload_size = payload_size;
 
         let print_loop = async move {
             loop {
@@ -380,10 +380,7 @@ impl Node for ScalPongSink {
             false => "single".to_string(),
         };
 
-        let diff = match mode {
-            1 => false,
-            _ => true,
-        };
+        let diff = !matches!(mode, 1);
 
         let mut config = zenoh::config::Config::default();
         config

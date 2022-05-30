@@ -67,6 +67,12 @@ impl Source<Latency> for LatSource {
 #[derive(Clone)]
 pub struct NoOp {}
 
+impl Default for NoOp {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl NoOp {
     pub fn new() -> Self {
         Self {}
@@ -74,9 +80,7 @@ impl NoOp {
 }
 
 impl OneInOneOut<(), Latency, Latency> for NoOp {
-    fn setup(&mut self, _ctx: &mut SetupContext<()>) {
-        ()
-    }
+    fn setup(&mut self, _ctx: &mut SetupContext<()>) {}
 
     fn on_data(&mut self, ctx: &mut OneInOneOutContext<(), Latency>, data: &Latency) {
         let timestamp = ctx.timestamp().clone();
@@ -144,7 +148,7 @@ fn main() {
     let mut node = Node::new(erdos_config);
 
     let source_stream = erdos::connect_source(
-        move || LatSource::new(interval.clone()),
+        move || LatSource::new(interval),
         OperatorConfig::new().name("LatSource"),
     );
 

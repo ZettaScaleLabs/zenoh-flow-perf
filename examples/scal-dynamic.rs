@@ -16,11 +16,12 @@ use clap::Parser;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::str::FromStr;
-use zenoh_flow::model::dataflow::descriptor::{DataFlowDescriptor, Mapping};
+use zenoh_flow::model::dataflow::descriptor::DataFlowDescriptor;
 use zenoh_flow::model::link::{LinkDescriptor, PortDescriptor};
 use zenoh_flow::model::node::{OperatorDescriptor, SinkDescriptor, SourceDescriptor};
 use zenoh_flow::model::{InputDescriptor, OutputDescriptor};
-use zenoh_flow_perf::operators::LAT_PORT;
+use zenoh_flow::{NodeId, RuntimeId};
+use zenoh_flow_perf::nodes::LAT_PORT;
 static DEFAULT_FACTOR: &str = "0";
 static DEFAULT_FANKIND: &str = "in";
 static DEFAULT_MSGS: &str = "1";
@@ -37,18 +38,18 @@ type ParseError = &'static str;
 
 #[derive(Parser, Debug)]
 enum FanKind {
-    FanIn,
-    FanOut,
-    FanOutFanIn,
+    In,
+    Out,
+    OutIn,
 }
 
 impl FromStr for FanKind {
     type Err = ParseError;
     fn from_str(fan: &str) -> Result<Self, Self::Err> {
         match fan {
-            "in" => Ok(FanKind::FanIn),
-            "out" => Ok(FanKind::FanOut),
-            "outin" => Ok(FanKind::FanOutFanIn),
+            "in" => Ok(FanKind::In),
+            "out" => Ok(FanKind::Out),
+            "outin" => Ok(FanKind::OutIn),
             _ => Err("Could not parse kind"),
         }
     }
@@ -80,24 +81,34 @@ async fn main() {
     let args = CallArgs::parse();
 
     if args.runtime {
-        zenoh_flow_perf::runtime::runtime(args.name, args.descriptor_file.clone(), args.listen, args.connect).await;
+        zenoh_flow_perf::runtime::runtime(
+            args.name,
+            args.descriptor_file.clone(),
+            args.listen,
+            args.connect,
+        )
+        .await;
     }
 
     let interval = 1.0 / (args.msgs as f64);
 
     let total_nodes: u64 = 1 << args.factor;
 
-    let config = match args.kind {
-        FanKind::FanIn => Some(
-            serde_json::json!({"interval" : interval, "nodes": total_nodes, "inputs": total_nodes, "msgs": args.msgs, "mode": 1, "multi":true}),
-        ),
-        FanKind::FanOut | FanKind::FanOutFanIn => Some(
-            serde_json::json!({"interval" : interval, "nodes": total_nodes, "inputs": total_nodes, "msgs": args.msgs, "mode": 2, "multi":true}),
-        ),
+    let mode: usize = match args.kind {
+        FanKind::In => 1,
+        FanKind::Out | FanKind::OutIn => 2,
     };
 
-    // Creating the descriptor
+    let config = Some(serde_json::json!({
+        "interval": interval,
+        "nodes": total_nodes,
+        "inputs": total_nodes,
+        "msgs": args.msgs,
+        "mode": mode,
+        "multi": true
+    }));
 
+    let mut mapping: HashMap<NodeId, RuntimeId> = HashMap::new();
     let mut dfd = DataFlowDescriptor {
         flow: format!("scaling{}", total_nodes),
         operators: vec![],
@@ -107,6 +118,8 @@ async fn main() {
         mapping: None,
         deadlines: None,
         loops: None,
+        global_configuration: None,
+        flags: None,
     };
 
     // Source and Sink
@@ -127,13 +140,10 @@ async fn main() {
     dfd.sources.push(source_descriptor);
 
     match args.kind {
-        FanKind::FanIn => {
+        FanKind::In => {
             let mut id_hm: HashMap<String, Value> = HashMap::new();
-            id_hm.insert("id".to_string(), 0.into());
-            let sink_config = Some(zenoh_flow_perf::operators::dict_merge(
-                &config.clone().unwrap(),
-                &id_hm,
-            ));
+            id_hm.insert("id".to_string(), serde_json::to_value::<usize>(0).unwrap());
+            let sink_config = Some(zenoh_flow_perf::nodes::dict_merge(&config.unwrap(), &id_hm));
 
             // creating sink
             let sink_descriptor = SinkDescriptor {
@@ -147,12 +157,7 @@ async fn main() {
                 runtime: None,
             };
             dfd.sinks.push(sink_descriptor);
-
-            // Sink mapping
-            dfd.add_mapping(Mapping {
-                id: "sink".into(),
-                runtime: "snk".into(),
-            });
+            mapping.insert("sink".into(), "snk".into());
 
             // creating nodes
             for i in 0..total_nodes {
@@ -185,7 +190,7 @@ async fn main() {
 
             // creating last operator (fan-in)
             let op_descriptor = OperatorDescriptor {
-                id: format!("op-last").into(),
+                id: "op-last".into(),
                 inputs,
                 outputs: vec![PortDescriptor {
                     port_id: LAT_PORT.into(),
@@ -197,11 +202,7 @@ async fn main() {
                 deadline: None,
             };
             dfd.operators.push(op_descriptor);
-
-            dfd.add_mapping(Mapping {
-                id: "op-last".into(),
-                runtime: "complast".into(),
-            });
+            mapping.insert("op-last".into(), "complast".into());
 
             let op_last_snk_link = LinkDescriptor {
                 from: OutputDescriptor {
@@ -252,7 +253,7 @@ async fn main() {
                 dfd.links.push(op_op_link);
             }
         }
-        FanKind::FanOut => {
+        FanKind::Out => {
             // Creating operators
             for i in 0..total_nodes {
                 let op_descriptor = OperatorDescriptor {
@@ -278,7 +279,7 @@ async fn main() {
                 let mut id_hm: HashMap<String, Value> = HashMap::new();
                 id_hm.insert("id".to_string(), i.into());
                 let sink_config =
-                    zenoh_flow_perf::operators::dict_merge(&config.clone().unwrap(), &id_hm);
+                    zenoh_flow_perf::nodes::dict_merge(&config.clone().unwrap(), &id_hm);
 
                 let sink_descriptor = SinkDescriptor {
                     id: format!("sink-{i}").into(),
@@ -296,10 +297,7 @@ async fn main() {
 
             // sink mapping
             for i in 0..total_nodes {
-                dfd.add_mapping(Mapping {
-                    id: format!("sink-{i}").into(),
-                    runtime: format!("snk{i}").into(),
-                });
+                mapping.insert(format!("sink-{i}").into(), format!("snk{i}").into());
             }
 
             // creating links
@@ -340,21 +338,12 @@ async fn main() {
     }
 
     // Creating static mapping
-
-    // Source mapping
-    dfd.add_mapping(Mapping {
-        id: "source".into(),
-        runtime: "src".into(),
-    });
-
-    // Operators mapping
+    mapping.insert("source".into(), "src".into());
     for i in 0..total_nodes {
-        dfd.add_mapping(Mapping {
-            id: format!("op-{i}").into(),
-            runtime: format!("comp{i}").into(),
-        });
+        mapping.insert(format!("op-{i}").into(), format!("comp{i}").into());
     }
 
+    dfd.mapping = Some(mapping);
     let yaml_descriptor = dfd.to_yaml().unwrap();
     // println!("Descriptor:\n{yaml_descriptor}");
 

@@ -61,19 +61,11 @@ impl Source<ThrData> for ThrSource {
     fn destroy(&mut self) {}
 }
 
-#[derive(Clone)]
+#[derive(Default, Clone)]
 pub struct NoOp {}
 
-impl NoOp {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
-
 impl OneInOneOut<(), ThrData, ThrData> for NoOp {
-    fn setup(&mut self, _ctx: &mut SetupContext<()>) {
-        ()
-    }
+    fn setup(&mut self, _ctx: &mut SetupContext<()>) {}
 
     fn on_data(&mut self, ctx: &mut OneInOneOutContext<(), ThrData>, data: &ThrData) {
         let timestamp = ctx.timestamp().clone();
@@ -105,7 +97,6 @@ impl ThrSink {
         let accumulator = Arc::new(AtomicUsize::new(0));
 
         let loop_accumulator = accumulator.clone();
-        let loop_payload_size = size.clone();
 
         let print_loop = move || {
             loop {
@@ -118,7 +109,7 @@ impl ThrSink {
                     let interval = 1_000_000.0 / elapsed;
                     let msgs = (c as f64 / interval).floor() as usize;
                     // framework, scenario, test, pipeline, payload, rate, value, unit
-                    println!("erdos,single,throughput,1,{loop_payload_size},{msgs},{msgs},msgs");
+                    println!("erdos,single,throughput,1,{size},{msgs},{msgs},msgs");
                 }
             }
         };
@@ -159,19 +150,19 @@ fn main() {
     let mut node = Node::new(erdos_config);
 
     let source_stream = erdos::connect_source(
-        move || ThrSource::new(args.size.clone()),
+        move || ThrSource::new(args.size),
         OperatorConfig::new().name("LatSource"),
     );
 
     let output_stream = erdos::connect_one_in_one_out(
-        NoOp::new,
+        NoOp::default,
         || {},
         OperatorConfig::new().name("NoOp"),
         &source_stream,
     );
 
     erdos::connect_sink(
-        move || ThrSink::new(args.size.clone()),
+        move || ThrSink::new(args.size),
         || {},
         OperatorConfig::new().name("LatSink"),
         &output_stream,

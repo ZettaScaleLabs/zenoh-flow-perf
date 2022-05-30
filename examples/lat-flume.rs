@@ -38,8 +38,8 @@ async fn main() {
     let (sender_ping, receiver_ping) = flume::unbounded::<Latency>();
     let (sender_pong, receiver_pong) = flume::unbounded::<()>();
 
-    let c_msgs = args.msgs.clone();
-    let pipeline_msgs = args.pipeline.clone();
+    let c_msgs = args.msgs;
+    let pipeline_msgs = args.pipeline;
     task::spawn(async move {
         while let Ok(data) = receiver_ping.recv_async().await {
             let now = get_epoch_us();

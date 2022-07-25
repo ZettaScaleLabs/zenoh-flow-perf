@@ -63,12 +63,11 @@ async fn main() {
     zf_graph
         .try_add_static_source(
             "thr-source".into(),
-            None,
+            config.clone(),
             PortDescriptor {
                 port_id: String::from(THR_PORT).into(),
                 port_type: String::from("thr").into(),
             },
-            source.initialize(&config).unwrap(),
             source,
         )
         .unwrap();
@@ -76,11 +75,11 @@ async fn main() {
     zf_graph
         .try_add_static_sink(
             "thr-sink".into(),
+            config.clone(),
             PortDescriptor {
                 port_id: String::from(THR_PORT).into(),
                 port_type: String::from("thr").into(),
             },
-            sink.initialize(&config).unwrap(),
             sink,
         )
         .unwrap();
@@ -88,6 +87,7 @@ async fn main() {
     zf_graph
         .try_add_static_operator(
             "noop".into(),
+            config.clone(),
             vec![PortDescriptor {
                 port_id: String::from(THR_PORT).into(),
                 port_type: String::from("thr").into(),
@@ -96,8 +96,6 @@ async fn main() {
                 port_id: String::from(THR_PORT).into(),
                 port_type: String::from("thr").into(),
             }],
-            None,
-            operator.initialize(&None).unwrap(),
             operator,
         )
         .unwrap();

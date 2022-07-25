@@ -1,59 +1,46 @@
 use crate::nodes::{LAT_PORT, THR_PORT};
 use crate::{get_epoch_us, Latency};
-
+use async_trait::async_trait;
 use std::collections::HashMap;
+use std::sync::Arc;
 use zenoh_flow::zenoh_flow_derive::ZFState;
 use zenoh_flow::{
-    default_input_rule, default_output_rule, zf_empty_state, Configuration, Data,
-    LocalDeadlineMiss, Node, NodeOutput, Operator, PortId, State, ZFResult,
+    zf_empty_state, AsyncIteration, Configuration, Data, Inputs, Message, Node, NodeOutput,
+    Operator, Outputs, PortId, ZFResult,
 };
+
+use std::convert::TryFrom;
+use uhlc::Timestamp;
+use uhlc::ID;
 
 // Latency OPERATOR
 
 #[derive(Debug)]
 pub struct NoOp;
 
+#[async_trait]
 impl Operator for NoOp {
-    fn input_rule(
+    async fn setup(
         &self,
-        _context: &mut zenoh_flow::Context,
-        state: &mut State,
-        tokens: &mut HashMap<PortId, zenoh_flow::InputToken>,
-    ) -> zenoh_flow::ZFResult<bool> {
-        default_input_rule(state, tokens)
-    }
+        configuration: &Option<Configuration>,
+        inputs: Inputs,
+        outputs: Outputs,
+    ) -> Arc<dyn AsyncIteration> {
+        let input = inputs.get(LAT_PORT).unwrap()[0].clone();
+        let output = outputs.get(LAT_PORT).unwrap()[0].clone();
 
-    fn run(
-        &self,
-        _context: &mut zenoh_flow::Context,
-        _state: &mut State,
-        inputs: &mut HashMap<PortId, zenoh_flow::runtime::message::DataMessage>,
-    ) -> zenoh_flow::ZFResult<HashMap<zenoh_flow::PortId, Data>> {
-        let mut results: HashMap<PortId, Data> = HashMap::new();
-
-        let data = inputs.get_mut(LAT_PORT).unwrap().get_inner_data().clone();
-
-        results.insert(LAT_PORT.into(), data);
-        Ok(results)
-    }
-
-    fn output_rule(
-        &self,
-        _context: &mut zenoh_flow::Context,
-        state: &mut State,
-        outputs: HashMap<PortId, Data>,
-        _deadline_miss: Option<LocalDeadlineMiss>,
-    ) -> zenoh_flow::ZFResult<HashMap<zenoh_flow::PortId, NodeOutput>> {
-        default_output_rule(state, outputs)
+        Arc::new(async move || {
+            if let Ok((_, msg)) = input.recv().await {
+                output.send(msg).await.unwrap();
+            }
+            Ok(())
+        })
     }
 }
 
+#[async_trait]
 impl Node for NoOp {
-    fn initialize(&self, _configuration: &Option<Configuration>) -> ZFResult<State> {
-        zf_empty_state!()
-    }
-
-    fn finalize(&self, _state: &mut State) -> ZFResult<()> {
+    async fn finalize(&self) -> ZFResult<()> {
         Ok(())
     }
 }
@@ -71,58 +58,14 @@ struct LatOpState {
 #[derive(Debug)]
 pub struct NoOpPrint;
 
+#[async_trait]
 impl Operator for NoOpPrint {
-    fn input_rule(
+    async fn setup(
         &self,
-        _context: &mut zenoh_flow::Context,
-        state: &mut State,
-        tokens: &mut HashMap<PortId, zenoh_flow::InputToken>,
-    ) -> zenoh_flow::ZFResult<bool> {
-        default_input_rule(state, tokens)
-    }
-
-    fn run(
-        &self,
-        _context: &mut zenoh_flow::Context,
-        state: &mut State,
-        inputs: &mut HashMap<PortId, zenoh_flow::runtime::message::DataMessage>,
-    ) -> zenoh_flow::ZFResult<HashMap<zenoh_flow::PortId, Data>> {
-        let results: HashMap<PortId, Data> = HashMap::new();
-
-        let real_state = state.try_get::<LatOpState>()?;
-        let layer = &real_state.layer;
-        let _ = real_state.interval;
-
-        let data = inputs
-            .get_mut(LAT_PORT)
-            .unwrap()
-            .get_inner_data()
-            .try_get::<Latency>()?;
-
-        let now = get_epoch_us();
-
-        let elapsed = now - data.ts;
-        let msgs = real_state.msgs;
-        let pipeline = real_state.pipeline;
-        // layer,scenario name,test kind, test name, payload size, msg/s, pipeline size, latency, unit
-        println!("{layer},scenario,latency,pipeline,{msgs},{pipeline},{elapsed},us");
-
-        Ok(results)
-    }
-
-    fn output_rule(
-        &self,
-        _context: &mut zenoh_flow::Context,
-        state: &mut State,
-        outputs: HashMap<PortId, Data>,
-        _deadline_miss: Option<LocalDeadlineMiss>,
-    ) -> zenoh_flow::ZFResult<HashMap<zenoh_flow::PortId, NodeOutput>> {
-        default_output_rule(state, outputs)
-    }
-}
-
-impl Node for NoOpPrint {
-    fn initialize(&self, configuration: &Option<Configuration>) -> ZFResult<State> {
+        configuration: &Option<Configuration>,
+        inputs: Inputs,
+        outputs: Outputs,
+    ) -> Arc<dyn AsyncIteration> {
         let interval = match configuration {
             Some(conf) => conf["interval"].as_f64().unwrap(),
             None => 1.0f64,
@@ -148,15 +91,42 @@ impl Node for NoOpPrint {
             false => "zf-src-op".to_string(),
         };
 
-        Ok(State::from(LatOpState {
+        let state = LatOpState {
             interval,
             pipeline,
             msgs,
             layer,
-        }))
-    }
+        };
 
-    fn finalize(&self, _state: &mut State) -> ZFResult<()> {
+        let input = inputs.get(LAT_PORT).unwrap()[0].clone();
+
+        Arc::new(async move || {
+            if let Ok((_, msg)) = input.recv().await {
+                match msg.as_ref() {
+                    Message::Data(msg) => {
+                        let mut msg = msg.clone();
+                        let data = msg.get_inner_data().try_get::<Latency>()?;
+                        let now = get_epoch_us();
+
+                        let elapsed = now - data.ts;
+                        let msgs = state.msgs;
+                        let pipeline = state.pipeline;
+                        let layer = state.layer;
+                        println!(
+                            "{layer},scenario,latency,pipeline,{msgs},{pipeline},{elapsed},us"
+                        );
+                    }
+                    _ => (),
+                }
+            }
+            Ok(())
+        })
+    }
+}
+
+#[async_trait]
+impl Node for NoOpPrint {
+    async fn finalize(&self) -> ZFResult<()> {
         Ok(())
     }
 }
@@ -165,48 +135,29 @@ impl Node for NoOpPrint {
 
 #[derive(Debug)]
 pub struct ThrNoOp;
-
+#[async_trait]
 impl Operator for ThrNoOp {
-    fn input_rule(
+    async fn setup(
         &self,
-        _context: &mut zenoh_flow::Context,
-        state: &mut State,
-        tokens: &mut HashMap<PortId, zenoh_flow::InputToken>,
-    ) -> zenoh_flow::ZFResult<bool> {
-        default_input_rule(state, tokens)
-    }
+        configuration: &Option<Configuration>,
+        inputs: Inputs,
+        outputs: Outputs,
+    ) -> Arc<dyn AsyncIteration> {
+        let input = inputs.get(THR_PORT).unwrap()[0].clone();
+        let output = outputs.get(THR_PORT).unwrap()[0].clone();
 
-    fn run(
-        &self,
-        _context: &mut zenoh_flow::Context,
-        _state: &mut State,
-        inputs: &mut HashMap<PortId, zenoh_flow::runtime::message::DataMessage>,
-    ) -> zenoh_flow::ZFResult<HashMap<zenoh_flow::PortId, Data>> {
-        let mut results: HashMap<PortId, Data> = HashMap::new();
-
-        let data = inputs.get_mut(THR_PORT).unwrap().get_inner_data().clone();
-
-        results.insert(THR_PORT.into(), data);
-        Ok(results)
-    }
-
-    fn output_rule(
-        &self,
-        _context: &mut zenoh_flow::Context,
-        state: &mut State,
-        outputs: HashMap<PortId, Data>,
-        _deadline_miss: Option<LocalDeadlineMiss>,
-    ) -> zenoh_flow::ZFResult<HashMap<zenoh_flow::PortId, NodeOutput>> {
-        default_output_rule(state, outputs)
+        Arc::new(async move || {
+            if let Ok((_, msg)) = input.recv().await {
+                output.send(msg).await.unwrap();
+            }
+            Ok(())
+        })
     }
 }
 
+#[async_trait]
 impl Node for ThrNoOp {
-    fn initialize(&self, _configuration: &Option<Configuration>) -> ZFResult<State> {
-        zf_empty_state!()
-    }
-
-    fn finalize(&self, _state: &mut State) -> ZFResult<()> {
+    async fn finalize(&self) -> ZFResult<()> {
         Ok(())
     }
 }
@@ -220,64 +171,51 @@ struct IROpState {
 
 #[derive(Debug)]
 pub struct IRNoOp;
-
+#[async_trait]
 impl Operator for IRNoOp {
-    fn input_rule(
+    async fn setup(
         &self,
-        _context: &mut zenoh_flow::Context,
-        state: &mut State,
-        tokens: &mut HashMap<PortId, zenoh_flow::InputToken>,
-    ) -> zenoh_flow::ZFResult<bool> {
-        default_input_rule(state, tokens)
-    }
-
-    fn run(
-        &self,
-        _context: &mut zenoh_flow::Context,
-        _state: &mut State,
-        inputs: &mut HashMap<PortId, zenoh_flow::runtime::message::DataMessage>,
-    ) -> zenoh_flow::ZFResult<HashMap<zenoh_flow::PortId, Data>> {
-        let mut results: HashMap<PortId, Data> = HashMap::new();
-
-        // let real_state = state.try_get::<LastOpState>()?;
-        let data = inputs
-            .get_mut("Data0")
-            .unwrap()
-            .get_inner_data()
-            .try_get::<Latency>()?;
-
-        let now = get_epoch_us();
-
-        let elapsed = now - data.ts;
-        let msg = Latency { ts: elapsed };
-
-        results.insert(LAT_PORT.into(), Data::from::<Latency>(msg));
-
-        Ok(results)
-    }
-
-    fn output_rule(
-        &self,
-        _context: &mut zenoh_flow::Context,
-        state: &mut State,
-        outputs: HashMap<PortId, Data>,
-        _deadline_miss: Option<LocalDeadlineMiss>,
-    ) -> zenoh_flow::ZFResult<HashMap<zenoh_flow::PortId, NodeOutput>> {
-        default_output_rule(state, outputs)
-    }
-}
-
-impl Node for IRNoOp {
-    fn initialize(&self, configuration: &Option<Configuration>) -> ZFResult<State> {
-        let inputs = match configuration {
+        configuration: &Option<Configuration>,
+        inputs: Inputs,
+        outputs: Outputs,
+    ) -> Arc<dyn AsyncIteration> {
+        let op_inputs = match configuration {
             Some(conf) => conf["inputs"].as_u64().unwrap(),
             None => 1,
         };
 
-        Ok(State::from(IROpState { _inputs: inputs }))
-    }
+        let state = IROpState { _inputs: op_inputs };
 
-    fn finalize(&self, _state: &mut State) -> ZFResult<()> {
+        let input = inputs.get("Data0").unwrap()[0].clone();
+        let output = outputs.get(LAT_PORT).unwrap()[0].clone();
+        let buf = [0x00, 0x00];
+        let id = ID::try_from(&buf[..1]).unwrap();
+        let ts = Timestamp::new(uhlc::NTP64(0), id);
+
+        Arc::new(async move || {
+            if let Ok((_, msg)) = input.recv().await {
+                match msg.as_ref() {
+                    Message::Data(msg) => {
+                        let mut msg = msg.clone();
+                        let data = msg.get_inner_data().try_get::<Latency>()?;
+                        let now = get_epoch_us();
+
+                        let elapsed = now - data.ts;
+                        let data = Data::from(Latency { ts: elapsed });
+                        let msg = Message::from_serdedata(data, ts);
+                        output.send(Arc::new(msg)).await.unwrap();
+                    }
+                    _ => (),
+                }
+            }
+            Ok(())
+        })
+    }
+}
+
+#[async_trait]
+impl Node for IRNoOp {
+    async fn finalize(&self) -> ZFResult<()> {
         Ok(())
     }
 }

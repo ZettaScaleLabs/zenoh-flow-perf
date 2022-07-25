@@ -45,6 +45,8 @@ pub async fn runtime(
     let df =
         zenoh_flow::model::dataflow::descriptor::DataFlowDescriptor::from_yaml(&yaml_df).unwrap();
 
+    let df = df.flatten().await.unwrap();
+
     // mapping to infrastructure
     let mapped = zenoh_flow::runtime::map_to_infrastructure(df, &name)
         .await

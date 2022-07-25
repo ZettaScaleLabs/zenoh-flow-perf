@@ -73,12 +73,11 @@ async fn main() {
     zf_graph
         .try_add_static_source(
             "lat-source".into(),
-            None,
+            config.clone(),
             PortDescriptor {
                 port_id: String::from(LAT_PORT).into(),
                 port_type: String::from("lat").into(),
             },
-            source.initialize(&config).unwrap(),
             source,
         )
         .unwrap();
@@ -86,11 +85,11 @@ async fn main() {
     zf_graph
         .try_add_static_sink(
             "lat-sink".into(),
+            config.clone(),
             PortDescriptor {
                 port_id: String::from(LAT_PORT).into(),
                 port_type: String::from("lat").into(),
             },
-            sink.initialize(&config).unwrap(),
             sink,
         )
         .unwrap();
@@ -99,6 +98,7 @@ async fn main() {
         zf_graph
             .try_add_static_operator(
                 format!("noop{i}").into(),
+                config.clone(),
                 vec![PortDescriptor {
                     port_id: String::from(LAT_PORT).into(),
                     port_type: String::from("lat").into(),
@@ -107,8 +107,6 @@ async fn main() {
                     port_id: String::from(LAT_PORT).into(),
                     port_type: String::from("lat").into(),
                 }],
-                None,
-                op.initialize(&None).unwrap(),
                 op,
             )
             .unwrap();

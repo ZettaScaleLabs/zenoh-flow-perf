@@ -11,6 +11,7 @@
 // Contributors:
 //   ZettaScale zenoh team, <zenoh@zettascale.tech>
 //
+#![feature(async_closure)]
 
 use std::fs::File;
 use std::io::Write;

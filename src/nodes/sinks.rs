@@ -9,7 +9,9 @@ use zenoh::prelude::*;
 use zenoh::publication::CongestionControl;
 use zenoh_flow::async_std::sync::Arc;
 use zenoh_flow::zenoh_flow_derive::ZFState;
-use zenoh_flow::{Configuration, Context, Node, Sink, State, ZFResult};
+use zenoh_flow::{AsyncIteration, Configuration, Inputs, Message, Node, Sink, ZFResult};
+
+use super::{LAT_PORT, THR_PORT};
 
 // Latency SINK
 pub struct LatSink;
@@ -23,38 +25,11 @@ struct LatSinkState {
 
 #[async_trait]
 impl Sink for LatSink {
-    async fn run(
+    async fn setup(
         &self,
-        _context: &mut Context,
-        state: &mut State,
-        mut input: zenoh_flow::runtime::message::DataMessage,
-    ) -> zenoh_flow::ZFResult<()> {
-        let real_state = state.try_get::<LatSinkState>()?;
-        let _ = real_state.interval;
-
-        let data = input.get_inner_data().try_get::<Latency>()?;
-
-        let now = get_epoch_us();
-
-        let elapsed = now - data.ts;
-        let msgs = real_state.msgs;
-        let pipeline = real_state.pipeline;
-
-        // layer,scenario,test,name,messages,pipeline,latency,x,unit
-        // println!("zenoh-flow,single,latency,{msgs},{pipeline},{elapsed},8,us");
-
-        // framework, scenario, test, pipeline, payload, rate, value, unit
-        println!("zenoh-flow,single,latency,{pipeline},8,{msgs},{elapsed},us");
-
-        // layer,scenario name,test kind, test name, payload size, msg/s, pipeline size, latency, unit
-        // println!("zenoh-flow,scenario,latency,pipeline,{msgs},{pipeline},{elapsed},us");
-
-        Ok(())
-    }
-}
-
-impl Node for LatSink {
-    fn initialize(&self, configuration: &Option<Configuration>) -> ZFResult<State> {
+        configuration: &Option<Configuration>,
+        inputs: Inputs,
+    ) -> Arc<dyn AsyncIteration> {
         let interval = match configuration {
             Some(conf) => conf["interval"].as_f64().unwrap(),
             None => 1.0f64,
@@ -70,16 +45,38 @@ impl Node for LatSink {
             None => 1u64,
         };
 
-        Ok(State::from(LatSinkState {
+        let state = LatSinkState {
             interval,
             pipeline,
             msgs,
-        }))
+        };
+
+        let input = inputs.get(LAT_PORT).unwrap()[0].clone();
+
+        Arc::new(async move || {
+            if let Ok((_, msg)) = input.recv().await {
+                match msg.as_ref() {
+                    Message::Data(msg) => {
+                        let mut msg = msg.clone();
+                        let data = msg.get_inner_data().try_get::<Latency>()?;
+                        let now = get_epoch_us();
+
+                        let elapsed = now - data.ts;
+                        let msgs = state.msgs;
+                        let pipeline = state.pipeline;
+                        println!("zenoh-flow,single,latency,{pipeline},8,{msgs},{elapsed},us");
+                    }
+                    _ => (),
+                }
+            }
+            Ok(())
+        })
     }
+}
 
-    fn finalize(&self, state: &mut State) -> ZFResult<()> {
-        let _real_state = state.try_get::<LatSinkState>()?;
-
+#[async_trait]
+impl Node for LatSink {
+    async fn finalize(&self) -> ZFResult<()> {
         Ok(())
     }
 }
@@ -101,46 +98,11 @@ struct PongSinkState {
 
 #[async_trait]
 impl Sink for PongSink {
-    async fn run(
+    async fn setup(
         &self,
-        _context: &mut Context,
-        state: &mut State,
-        mut input: zenoh_flow::runtime::message::DataMessage,
-    ) -> zenoh_flow::ZFResult<()> {
-        let real_state = state.try_get::<PongSinkState>()?;
-        let layer = &real_state.layer;
-        let _ = real_state.interval;
-
-        let data = input.get_inner_data().try_get::<Latency>()?;
-
-        let now = get_epoch_us();
-
-        let elapsed = now - data.ts;
-        let msgs = real_state.msgs;
-        let pipeline = real_state.pipeline;
-
-        // layer,scenario,test,name,messages,pipeline,latency,time,unit
-        // println!("zenoh-flow,{layer},latency,zenoh-flow-latency,{msgs},{pipeline},{elapsed},8,us");
-
-        // framework, scenario, test, pipeline, payload, rate, value, unit
-        println!("zenoh-flow,{layer},latency,{pipeline},8,{msgs},{elapsed},us");
-
-        // layer,scenario name,test kind, test name, payload size, msg/s, pipeline size, latency, unit
-        // println!("{layer},scenario,latency,pipeline,{msgs},{pipeline},{elapsed},us");
-
-        // pong back
-        real_state
-            .session
-            .put(&real_state.expr, real_state.data.clone())
-            .congestion_control(CongestionControl::Block)
-            .await?;
-
-        Ok(())
-    }
-}
-
-impl Node for PongSink {
-    fn initialize(&self, configuration: &Option<Configuration>) -> ZFResult<State> {
+        configuration: &Option<Configuration>,
+        inputs: Inputs,
+    ) -> Arc<dyn AsyncIteration> {
         let interval = match configuration {
             Some(conf) => conf["interval"].as_f64().unwrap(),
             None => 1.0f64,
@@ -177,7 +139,7 @@ impl Node for PongSink {
             .wait()
             .unwrap();
 
-        Ok(State::from(PongSinkState {
+        let state = PongSinkState {
             interval,
             pipeline,
             msgs,
@@ -185,12 +147,40 @@ impl Node for PongSink {
             expr,
             data: vec![],
             layer,
-        }))
+        };
+
+        let input = inputs.get(LAT_PORT).unwrap()[0].clone();
+
+        Arc::new(async move || {
+            if let Ok((_, msg)) = input.recv().await {
+                match msg.as_ref() {
+                    Message::Data(msg) => {
+                        let mut msg = msg.clone();
+                        let data = msg.get_inner_data().try_get::<Latency>()?;
+                        let now = get_epoch_us();
+
+                        let elapsed = now - data.ts;
+                        let msgs = state.msgs;
+                        let pipeline = state.pipeline;
+                        let layer = state.layer;
+                        println!("zenoh-flow,{layer},latency,{pipeline},8,{msgs},{elapsed},us");
+
+                        state
+                            .session
+                            .put(&state.expr, state.data.clone())
+                            .congestion_control(CongestionControl::Block)
+                            .await?;
+                    }
+                    _ => (),
+                }
+            }
+            Ok(())
+        })
     }
-
-    fn finalize(&self, state: &mut State) -> ZFResult<()> {
-        let _real_state = state.try_get::<PongSinkState>()?;
-
+}
+#[async_trait]
+impl Node for PongSink {
+    async fn finalize(&self) -> ZFResult<()> {
         Ok(())
     }
 }
@@ -208,20 +198,11 @@ struct SinkState {
 
 #[async_trait]
 impl Sink for ThrSink {
-    async fn run(
+    async fn setup(
         &self,
-        _context: &mut Context,
-        state: &mut State,
-        _input: zenoh_flow::runtime::message::DataMessage,
-    ) -> zenoh_flow::ZFResult<()> {
-        let my_state = state.try_get::<SinkState>()?;
-        my_state.accumulator.fetch_add(1, Ordering::Relaxed);
-        Ok(())
-    }
-}
-
-impl Node for ThrSink {
-    fn initialize(&self, configuration: &Option<Configuration>) -> ZFResult<State> {
+        configuration: &Option<Configuration>,
+        inputs: Inputs,
+    ) -> Arc<dyn AsyncIteration> {
         let payload_size = match configuration {
             Some(conf) => conf["payload_size"].as_u64().unwrap() as usize,
             None => 8usize,
@@ -268,17 +249,31 @@ impl Node for ThrSink {
         let (abort_handle, abort_registration) = AbortHandle::new_pair();
         let _print_task = async_std::task::spawn(Abortable::new(print_loop, abort_registration));
 
-        Ok(State::from(SinkState {
+        let state = SinkState {
             _payload_size: payload_size,
             accumulator,
             abort_handle,
-        }))
+        };
+
+        let input = inputs.get(THR_PORT).unwrap()[0].clone();
+
+        Arc::new(async move || {
+            if let Ok((_, msg)) = input.recv().await {
+                match msg.as_ref() {
+                    Message::Data(_) => {
+                        state.accumulator.fetch_add(1, Ordering::Relaxed);
+                    }
+                    _ => (),
+                }
+            }
+            Ok(())
+        })
     }
+}
 
-    fn finalize(&self, state: &mut State) -> ZFResult<()> {
-        let real_state = state.try_get::<SinkState>()?;
-
-        real_state.abort_handle.abort();
+#[async_trait]
+impl Node for ThrSink {
+    async fn finalize(&self) -> ZFResult<()> {
         Ok(())
     }
 }
@@ -301,49 +296,11 @@ struct ScalPongSinkState {
 
 #[async_trait]
 impl Sink for ScalPongSink {
-    async fn run(
+    async fn setup(
         &self,
-        _context: &mut Context,
-        state: &mut State,
-        mut input: zenoh_flow::runtime::message::DataMessage,
-    ) -> zenoh_flow::ZFResult<()> {
-        let now = get_epoch_us();
-
-        let real_state = state.try_get::<ScalPongSinkState>()?;
-
-        let _ = real_state.interval;
-
-        let data = input.get_inner_data().try_get::<Latency>()?;
-
-        let layer = &real_state.layer;
-        let elapsed = match real_state.diff {
-            true => now - data.ts,
-            false => data.ts,
-        };
-        let msgs = real_state.msgs;
-        let pipeline = real_state.nodes;
-        // layer,scenario name,test kind, test name, payload size, msg/s, pipeline size, latency, unit
-        // println!("{layer},scalability,latency,pipeline,{msgs},{pipeline},{elapsed},us");
-
-        // layer,scenario,test,name,messages,pipeline,latency,x,unit
-        // println!("zenoh-flow,{layer},latency,zenoh-flow-latency,{msgs},{pipeline},{elapsed},8,us");
-
-        // framework, scenario, test, pipeline, payload, rate, value, unit
-        println!("zenoh-flow,{layer},latency,{pipeline},8,{msgs},{elapsed},us");
-
-        // pong back
-        real_state
-            .session
-            .put(&real_state.expr, real_state.data.clone())
-            .congestion_control(CongestionControl::Block)
-            .await?;
-
-        Ok(())
-    }
-}
-
-impl Node for ScalPongSink {
-    fn initialize(&self, configuration: &Option<Configuration>) -> ZFResult<State> {
+        configuration: &Option<Configuration>,
+        inputs: Inputs,
+    ) -> Arc<dyn AsyncIteration> {
         let mut rng = rand::thread_rng();
         let interval = match configuration {
             Some(conf) => conf["interval"].as_f64().unwrap(),
@@ -399,7 +356,7 @@ impl Node for ScalPongSink {
             .wait()
             .unwrap();
 
-        Ok(State::from(ScalPongSinkState {
+        let state = ScalPongSinkState {
             interval,
             nodes,
             msgs,
@@ -408,12 +365,44 @@ impl Node for ScalPongSink {
             data: vec![],
             diff,
             layer,
-        }))
+        };
+
+        let input = inputs.get(LAT_PORT).unwrap()[0].clone();
+
+        Arc::new(async move || {
+            if let Ok((_, msg)) = input.recv().await {
+                match msg.as_ref() {
+                    Message::Data(msg) => {
+                        let mut msg = msg.clone();
+                        let data = msg.get_inner_data().try_get::<Latency>()?;
+                        let now = get_epoch_us();
+
+                        let elapsed = match state.diff {
+                            true => now - data.ts,
+                            false => data.ts,
+                        };
+                        let msgs = state.msgs;
+                        let pipeline = state.nodes;
+                        let layer = &state.layer;
+                        println!("zenoh-flow,{layer},latency,{pipeline},8,{msgs},{elapsed},us");
+
+                        state
+                            .session
+                            .put(&state.expr, state.data.clone())
+                            .congestion_control(CongestionControl::Block)
+                            .await?;
+                    }
+                    _ => (),
+                }
+            }
+            Ok(())
+        })
     }
+}
 
-    fn finalize(&self, state: &mut State) -> ZFResult<()> {
-        let _real_state = state.try_get::<ScalPongSinkState>()?;
-
+#[async_trait]
+impl Node for ScalPongSink {
+    async fn finalize(&self) -> ZFResult<()> {
         Ok(())
     }
 }

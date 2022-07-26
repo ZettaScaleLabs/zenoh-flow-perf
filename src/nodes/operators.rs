@@ -31,7 +31,14 @@ impl Operator for NoOp {
 
         Arc::new(async move || {
             if let Ok((_, msg)) = input.recv().await {
-                output.send(msg).await.unwrap();
+                match msg.as_ref() {
+                    Message::Data(msg) => {
+                        let mut msg = msg.clone();
+                        let data = Data::from(msg.get_inner_data().try_get::<Latency>()?.clone());
+                        output.send(Arc::new(data)).await.unwrap();
+                    }
+                    _ => (),
+                }
             }
             Ok(())
         })
@@ -148,7 +155,14 @@ impl Operator for ThrNoOp {
 
         Arc::new(async move || {
             if let Ok((_, msg)) = input.recv().await {
-                output.send(msg).await.unwrap();
+                match msg.as_ref() {
+                    Message::Data(msg) => {
+                        let mut msg = msg.clone();
+                        let data = Data::from(msg.get_inner_data().try_get::<Latency>()?.clone());
+                        output.send(Arc::new(data)).await.unwrap();
+                    }
+                    _ => (),
+                }
             }
             Ok(())
         })
@@ -202,8 +216,8 @@ impl Operator for IRNoOp {
 
                         let elapsed = now - data.ts;
                         let data = Data::from(Latency { ts: elapsed });
-                        let msg = Message::from_serdedata(data, ts);
-                        output.send(Arc::new(msg)).await.unwrap();
+                        // let msg = Message::from_serdedata(data, ts);
+                        output.send(Arc::new(data)).await.unwrap();
                     }
                     _ => (),
                 }

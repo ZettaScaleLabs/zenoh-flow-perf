@@ -42,9 +42,9 @@ impl Source for LatSource {
         Arc::new(async move || {
             async_std::task::sleep(Duration::from_secs_f64(state.interval)).await;
             let data = Data::from(Latency { ts: get_epoch_us() });
-            let ts = Timestamp::new(uhlc::NTP64(0), id);
-            let msg = Message::from_serdedata(data, ts);
-            output.send(Arc::new(msg)).await.unwrap();
+            // let ts = Timestamp::new(uhlc::NTP64(0), id);
+            // let msg = Message::from_serdedata(data, ts);
+            output.send(Arc::new(data)).await.unwrap();
             Ok(())
         })
     }
@@ -119,9 +119,9 @@ impl Source for PingSource {
             }
 
             let data = Data::from(Latency { ts: get_epoch_us() });
-            let ts = Timestamp::new(uhlc::NTP64(0), id);
-            let msg = Message::from_serdedata(data, ts);
-            output.send(Arc::new(msg)).await.unwrap();
+            // let ts = Timestamp::new(uhlc::NTP64(0), id);
+            // let msg = Message::from_serdedata(data, ts);
+            output.send(Arc::new(data)).await.unwrap();
             Ok(())
         })
     }
@@ -170,9 +170,9 @@ impl Source for ThrSource {
         Arc::new(async move || {
             let data = state.data.clone();
             let data = Data::from_arc::<ThrData>(data);
-            let ts = Timestamp::new(uhlc::NTP64(0), id);
-            let msg = Message::from_serdedata(data, ts);
-            output.send(Arc::new(msg)).await.unwrap();
+            // let ts = Timestamp::new(uhlc::NTP64(0), id);
+            // let msg = Message::from_serdedata(data, ts);
+            output.send(Arc::new(data)).await.unwrap();
             Ok(())
         })
     }
@@ -279,9 +279,9 @@ impl Source for ScalPingSource {
             }
 
             let data = Data::from(Latency { ts: get_epoch_us() });
-            let ts = Timestamp::new(uhlc::NTP64(0), id);
-            let msg = Message::from_serdedata(data, ts);
-            output.send(Arc::new(msg)).await.unwrap();
+            // let ts = Timestamp::new(uhlc::NTP64(0), id);
+            // let msg = Message::from_serdedata(data, ts);
+            output.send(Arc::new(data)).await.unwrap();
             Ok(())
         })
     }

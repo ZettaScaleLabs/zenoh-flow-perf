@@ -132,7 +132,7 @@ async fn main() {
         )
         .unwrap();
 
-    let mut instance = DataflowInstance::try_instantiate(zf_graph).unwrap();
+    let mut instance = DataflowInstance::try_instantiate(zf_graph, ctx.hlc.clone()).unwrap();
 
     let nodes = instance.get_nodes();
     for id in &nodes {

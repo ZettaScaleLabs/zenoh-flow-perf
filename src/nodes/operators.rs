@@ -1,17 +1,13 @@
 use crate::nodes::{LAT_PORT, THR_PORT};
 use crate::{get_epoch_us, Latency};
 use async_trait::async_trait;
-use std::collections::HashMap;
 use std::sync::Arc;
 use zenoh_flow::zenoh_flow_derive::ZFState;
-use zenoh_flow::{
-    zf_empty_state, AsyncIteration, Configuration, Data, Inputs, Message, Node, NodeOutput,
-    Operator, Outputs, PortId, ZFResult,
+use zenoh_flow::{AsyncIteration, Configuration, Data, Inputs, Message, Node,
+    Operator, Outputs, ZFResult,
 };
 
-use std::convert::TryFrom;
-use uhlc::Timestamp;
-use uhlc::ID;
+
 
 // Latency OPERATOR
 
@@ -22,7 +18,7 @@ pub struct NoOp;
 impl Operator for NoOp {
     async fn setup(
         &self,
-        configuration: &Option<Configuration>,
+        _configuration: &Option<Configuration>,
         inputs: Inputs,
         outputs: Outputs,
     ) -> Arc<dyn AsyncIteration> {
@@ -31,7 +27,12 @@ impl Operator for NoOp {
 
         Arc::new(async move || {
             if let Ok((_, msg)) = input.recv().await {
-                output.send(msg).await.unwrap();
+                match msg {
+                    Message::Data(mut msg) => {
+                        output.send(msg.get_inner_data().clone(), None).await.unwrap();
+                    }
+                    _ => (),
+                }
             }
             Ok(())
         })
@@ -64,7 +65,7 @@ impl Operator for NoOpPrint {
         &self,
         configuration: &Option<Configuration>,
         inputs: Inputs,
-        outputs: Outputs,
+        _outputs: Outputs,
     ) -> Arc<dyn AsyncIteration> {
         let interval = match configuration {
             Some(conf) => conf["interval"].as_f64().unwrap(),
@@ -102,9 +103,8 @@ impl Operator for NoOpPrint {
 
         Arc::new(async move || {
             if let Ok((_, msg)) = input.recv().await {
-                match msg.as_ref() {
-                    Message::Data(msg) => {
-                        let mut msg = msg.clone();
+                match msg {
+                    Message::Data(mut msg) => {
                         let data = msg.get_inner_data().try_get::<Latency>()?;
                         let now = get_epoch_us();
 
@@ -139,7 +139,7 @@ pub struct ThrNoOp;
 impl Operator for ThrNoOp {
     async fn setup(
         &self,
-        configuration: &Option<Configuration>,
+        _configuration: &Option<Configuration>,
         inputs: Inputs,
         outputs: Outputs,
     ) -> Arc<dyn AsyncIteration> {
@@ -148,7 +148,12 @@ impl Operator for ThrNoOp {
 
         Arc::new(async move || {
             if let Ok((_, msg)) = input.recv().await {
-                output.send(msg).await.unwrap();
+                match msg {
+                    Message::Data(mut msg) => {
+                        output.send(msg.get_inner_data().clone(), None).await.unwrap();
+                    }
+                    _ => (),
+                }
             }
             Ok(())
         })
@@ -184,26 +189,21 @@ impl Operator for IRNoOp {
             None => 1,
         };
 
-        let state = IROpState { _inputs: op_inputs };
+        let _state = IROpState { _inputs: op_inputs };
 
         let input = inputs.get("Data0").unwrap()[0].clone();
         let output = outputs.get(LAT_PORT).unwrap()[0].clone();
-        let buf = [0x00, 0x00];
-        let id = ID::try_from(&buf[..1]).unwrap();
-        let ts = Timestamp::new(uhlc::NTP64(0), id);
 
         Arc::new(async move || {
             if let Ok((_, msg)) = input.recv().await {
-                match msg.as_ref() {
-                    Message::Data(msg) => {
-                        let mut msg = msg.clone();
+                match msg {
+                    Message::Data(mut msg) => {
                         let data = msg.get_inner_data().try_get::<Latency>()?;
                         let now = get_epoch_us();
 
                         let elapsed = now - data.ts;
                         let data = Data::from(Latency { ts: elapsed });
-                        let msg = Message::from_serdedata(data, ts);
-                        output.send(Arc::new(msg)).await.unwrap();
+                        output.send(data, None).await.unwrap();
                     }
                     _ => (),
                 }

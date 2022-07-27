@@ -62,7 +62,7 @@ pub async fn runtime(
 
     // instantiating
     let mut instance =
-        zenoh_flow::runtime::dataflow::instance::DataflowInstance::try_instantiate(dataflow)
+        zenoh_flow::runtime::dataflow::instance::DataflowInstance::try_instantiate(dataflow, ctx.hlc.clone())
             .unwrap();
 
     let mut sinks = instance.get_sinks();

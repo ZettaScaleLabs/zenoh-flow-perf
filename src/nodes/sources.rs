@@ -1,15 +1,12 @@
 use crate::{get_epoch_us, Latency, ThrData};
 
 use async_trait::async_trait;
-use std::convert::TryFrom;
 use std::time::Duration;
-use uhlc::Timestamp;
-use uhlc::ID;
 use zenoh::prelude::*;
 use zenoh::subscriber::Subscriber;
 use zenoh_flow::async_std::sync::Arc;
 use zenoh_flow::zenoh_flow_derive::ZFState;
-use zenoh_flow::{AsyncIteration, Configuration, Data, Message, Node, Outputs, Source, ZFResult};
+use zenoh_flow::{AsyncIteration, Configuration, Data, Node, Outputs, Source, ZFResult};
 
 use super::{LAT_PORT, THR_PORT};
 
@@ -36,15 +33,11 @@ impl Source for LatSource {
 
         let state = LatSourceState { interval };
         let output = outputs.get(LAT_PORT).unwrap()[0].clone();
-        let buf = [0x00, 0x00];
-        let id = ID::try_from(&buf[..1]).unwrap();
 
         Arc::new(async move || {
             async_std::task::sleep(Duration::from_secs_f64(state.interval)).await;
             let data = Data::from(Latency { ts: get_epoch_us() });
-            let ts = Timestamp::new(uhlc::NTP64(0), id);
-            let msg = Message::from_serdedata(data, ts);
-            output.send(Arc::new(msg)).await.unwrap();
+            output.send(data,  None).await.unwrap();
             Ok(())
         })
     }
@@ -107,8 +100,6 @@ impl Source for PingSource {
         let mut state = PingSourceState::new(interval, sub);
 
         let output = outputs.get(LAT_PORT).unwrap()[0].clone();
-        let buf = [0x00, 0x00];
-        let id = ID::try_from(&buf[..1]).unwrap();
 
         Arc::new(async move || {
             async_std::task::sleep(Duration::from_secs_f64(state.interval)).await;
@@ -119,9 +110,7 @@ impl Source for PingSource {
             }
 
             let data = Data::from(Latency { ts: get_epoch_us() });
-            let ts = Timestamp::new(uhlc::NTP64(0), id);
-            let msg = Message::from_serdedata(data, ts);
-            output.send(Arc::new(msg)).await.unwrap();
+            output.send(data,  None).await.unwrap();
             Ok(())
         })
     }
@@ -164,15 +153,11 @@ impl Source for ThrSource {
 
         let state = ThrSourceState { data };
         let output = outputs.get(THR_PORT).unwrap()[0].clone();
-        let buf = [0x00, 0x00];
-        let id = ID::try_from(&buf[..1]).unwrap();
 
         Arc::new(async move || {
             let data = state.data.clone();
             let data = Data::from_arc::<ThrData>(data);
-            let ts = Timestamp::new(uhlc::NTP64(0), id);
-            let msg = Message::from_serdedata(data, ts);
-            output.send(Arc::new(msg)).await.unwrap();
+            output.send(data,  None).await.unwrap();
             Ok(())
         })
     }
@@ -264,8 +249,6 @@ impl Source for ScalPingSource {
         let mut state = ScalPingSourceState::new(interval, subs);
 
         let output = outputs.get(LAT_PORT).unwrap()[0].clone();
-        let buf = [0x00, 0x00];
-        let id = ID::try_from(&buf[..1]).unwrap();
 
         Arc::new(async move || {
             async_std::task::sleep(Duration::from_secs_f64(state.interval)).await;
@@ -279,9 +262,7 @@ impl Source for ScalPingSource {
             }
 
             let data = Data::from(Latency { ts: get_epoch_us() });
-            let ts = Timestamp::new(uhlc::NTP64(0), id);
-            let msg = Message::from_serdedata(data, ts);
-            output.send(Arc::new(msg)).await.unwrap();
+            output.send(data,  None).await.unwrap();
             Ok(())
         })
     }

@@ -172,7 +172,7 @@ async fn main() {
 
     // println!("Pipeline is: {pipe}");
 
-    let mut instance = DataflowInstance::try_instantiate(zf_graph).unwrap();
+    let mut instance = DataflowInstance::try_instantiate(zf_graph, ctx.hlc.clone()).unwrap();
 
     let mut sinks = instance.get_sinks();
     for id in sinks.drain(..) {

@@ -55,9 +55,8 @@ impl Sink for LatSink {
 
         Arc::new(async move || {
             if let Ok((_, msg)) = input.recv().await {
-                match msg.as_ref() {
-                    Message::Data(msg) => {
-                        let mut msg = msg.clone();
+                match msg {
+                    Message::Data(mut msg) => {
                         let data = msg.get_inner_data().try_get::<Latency>()?;
                         let now = get_epoch_us();
 
@@ -153,9 +152,8 @@ impl Sink for PongSink {
 
         Arc::new(async move || {
             if let Ok((_, msg)) = input.recv().await {
-                match msg.as_ref() {
-                    Message::Data(msg) => {
-                        let mut msg = msg.clone();
+                match msg {
+                    Message::Data(mut msg) => {
                         let data = msg.get_inner_data().try_get::<Latency>()?;
                         let now = get_epoch_us();
 
@@ -259,7 +257,7 @@ impl Sink for ThrSink {
 
         Arc::new(async move || {
             if let Ok((_, msg)) = input.recv().await {
-                match msg.as_ref() {
+                match msg {
                     Message::Data(_) => {
                         state.accumulator.fetch_add(1, Ordering::Relaxed);
                     }
@@ -371,9 +369,8 @@ impl Sink for ScalPongSink {
 
         Arc::new(async move || {
             if let Ok((_, msg)) = input.recv().await {
-                match msg.as_ref() {
-                    Message::Data(msg) => {
-                        let mut msg = msg.clone();
+                match msg {
+                    Message::Data(mut msg) => {
                         let data = msg.get_inner_data().try_get::<Latency>()?;
                         let now = get_epoch_us();
 

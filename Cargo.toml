@@ -16,6 +16,7 @@ readme = "README.md"
 
 [dependencies]
 zenoh-flow = { git = "https://github.com/ZettaScaleLabs/zenoh-flow.git", branch = "dev/v0.4.0" }
+# zenoh-flow = { path = "../zf-zetta/zenoh-flow" }
 
 #zenoh-flow = { path = "../zenoh-flow/zenoh-flow"}
 env_logger = "0.9"
@@ -25,7 +26,7 @@ typetag = "0.1"
 log = "0.4"
 bincode = "1"
 zenoh = { git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "master" }
-uhlc = "0.4.0"
+uhlc = "0.5"
 uuid = { version = "0.8", features = ["serde", "v4"] }
 async-trait = "0.1.50"
 futures = "0.3.5"

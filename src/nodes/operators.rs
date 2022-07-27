@@ -158,7 +158,7 @@ impl Operator for ThrNoOp {
                 match msg.as_ref() {
                     Message::Data(msg) => {
                         let mut msg = msg.clone();
-                        let data = Data::from(msg.get_inner_data().try_get::<Latency>()?.clone());
+                        let data = Data::from(msg.get_inner_data().try_get::<ThrData>()?.clone());
                         output.send(Arc::new(data)).await.unwrap();
                     }
                     _ => (),

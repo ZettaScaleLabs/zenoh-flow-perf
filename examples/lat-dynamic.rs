@@ -15,11 +15,12 @@
 use std::collections::HashMap;
 
 use clap::Parser;
-use zenoh_flow::model::dataflow::descriptor::DataFlowDescriptor;
+use zenoh_flow::model::dataflow::descriptor::FlattenDataFlowDescriptor;
 use zenoh_flow::model::link::{LinkDescriptor, PortDescriptor};
-use zenoh_flow::model::node::{OperatorDescriptor, SinkDescriptor, SourceDescriptor};
+use zenoh_flow::model::node::{SimpleOperatorDescriptor, SinkDescriptor, SourceDescriptor};
 use zenoh_flow::model::{InputDescriptor, OutputDescriptor};
 use zenoh_flow::{NodeId, RuntimeId};
+use zenoh_flow_perf::runtime::Descriptor;
 
 static DEFAULT_PIPELINE: &str = "1";
 static DEFAULT_MSGS: &str = "1";
@@ -63,7 +64,7 @@ async fn main() {
     if args.runtime {
         zenoh_flow_perf::runtime::runtime(
             args.name,
-            args.descriptor_file.clone(),
+            Descriptor::Flatten(args.descriptor_file.clone()),
             args.listen,
             args.connect,
         )
@@ -79,15 +80,13 @@ async fn main() {
     // Creating the descriptor
 
     let mut mapping: HashMap<NodeId, RuntimeId> = HashMap::new();
-    let mut dfd = DataFlowDescriptor {
+    let mut dfd = FlattenDataFlowDescriptor {
         flow: format!("pipeline{}", args.pipeline),
         operators: vec![],
         sources: vec![],
         sinks: vec![],
         links: vec![],
         mapping: None,
-        deadlines: None,
-        loops: None,
         global_configuration: None,
         flags: None,
     };
@@ -98,14 +97,14 @@ async fn main() {
         true => {
             let src = SourceDescriptor {
                 id: "source".into(),
-                period: None,
+                // period: None,
                 output: PortDescriptor {
                     port_id: PORT.into(),
                     port_type: "latency".into(),
                 },
                 uri: Some(String::from(PING_SRC_URI)),
                 configuration: config.clone(),
-                runtime: None,
+                tags: vec![],
             };
             let snk = SinkDescriptor {
                 id: "sink".into(),
@@ -115,21 +114,21 @@ async fn main() {
                 },
                 uri: Some(String::from(PONG_SNK_URI)),
                 configuration: config,
-                runtime: None,
+                tags: vec![],
             };
             (src, snk)
         }
         false => {
             let src = SourceDescriptor {
                 id: "source".into(),
-                period: None,
+                // period: None,
                 output: PortDescriptor {
                     port_id: PORT.into(),
                     port_type: "latency".into(),
                 },
                 uri: Some(String::from(SRC_URI)),
                 configuration: config.clone(),
-                runtime: None,
+                tags: vec![],
             };
             let snk = SinkDescriptor {
                 id: "sink".into(),
@@ -139,7 +138,7 @@ async fn main() {
                 },
                 uri: Some(String::from(SNK_URI)),
                 configuration: config,
-                runtime: None,
+                tags: vec![],
             };
             (src, snk)
         }
@@ -152,7 +151,7 @@ async fn main() {
     // Creating and adding operators to descriptors
 
     for i in 0..args.pipeline {
-        let op_descriptor = OperatorDescriptor {
+        let op_descriptor = SimpleOperatorDescriptor {
             id: format!("op-{i}").into(),
             inputs: vec![PortDescriptor {
                 port_id: PORT.into(),
@@ -164,8 +163,7 @@ async fn main() {
             }],
             uri: Some(String::from(NOOP_URI)),
             configuration: None,
-            runtime: None,
-            deadline: None,
+            tags: vec![],
         };
         dfd.operators.push(op_descriptor);
     }

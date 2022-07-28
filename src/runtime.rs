@@ -5,15 +5,18 @@ use zenoh_flow::async_std::sync::Arc;
 use zenoh_flow::runtime::dataflow::loader::{Loader, LoaderConfig};
 use zenoh_flow::runtime::RuntimeContext;
 
+pub enum Descriptor {
+    Composed(String),
+    Flatten(String),
+}
+
 pub async fn runtime(
     name: String,
-    descriptor_file: String,
+    descriptor: Descriptor,
     listen: Vec<String>,
     connect: Vec<String>,
 ) {
     env_logger::init();
-
-    let yaml_df = read_to_string(descriptor_file).unwrap();
 
     let loader_config = LoaderConfig::new();
 
@@ -41,11 +44,21 @@ pub async fn runtime(
         runtime_uuid: uuid::Uuid::new_v4(),
     };
 
-    // loading the descriptor
-    let df =
-        zenoh_flow::model::dataflow::descriptor::DataFlowDescriptor::from_yaml(&yaml_df).unwrap();
-
-    let df = df.flatten().await.unwrap();
+    // loading the descriptor, it can be a flattened one, or a composed one
+    let df = match descriptor {
+        Descriptor::Composed(descriptor_file) => {
+            let yaml_df = read_to_string(descriptor_file).unwrap();
+            let df =
+                zenoh_flow::model::dataflow::descriptor::DataFlowDescriptor::from_yaml(&yaml_df)
+                    .unwrap();
+            df.flatten().await.unwrap()
+        }
+        Descriptor::Flatten(descriptor_file) => {
+            let yaml_df = read_to_string(descriptor_file).unwrap();
+            zenoh_flow::model::dataflow::descriptor::FlattenDataFlowDescriptor::from_yaml(&yaml_df)
+                .unwrap()
+        }
+    };
 
     // mapping to infrastructure
     let mapped = zenoh_flow::runtime::map_to_infrastructure(df, &name)
@@ -61,9 +74,11 @@ pub async fn runtime(
     let dataflow = zenoh_flow::runtime::dataflow::Dataflow::try_new(ctx.clone(), dfr).unwrap();
 
     // instantiating
-    let mut instance =
-        zenoh_flow::runtime::dataflow::instance::DataflowInstance::try_instantiate(dataflow, ctx.hlc.clone())
-            .unwrap();
+    let mut instance = zenoh_flow::runtime::dataflow::instance::DataflowInstance::try_instantiate(
+        dataflow,
+        ctx.hlc.clone(),
+    )
+    .unwrap();
 
     let mut sinks = instance.get_sinks();
     for id in sinks.drain(..) {
@@ -85,5 +100,5 @@ pub async fn runtime(
         instance.start_node(id).await.unwrap()
     }
 
-    let () = std::future::pending().await;
+    std::future::pending::<()>().await;
 }

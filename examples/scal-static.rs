@@ -22,7 +22,6 @@ use zenoh_flow::model::{InputDescriptor, OutputDescriptor};
 use zenoh_flow::runtime::dataflow::instance::DataflowInstance;
 use zenoh_flow::runtime::dataflow::loader::{Loader, LoaderConfig};
 use zenoh_flow::runtime::RuntimeContext;
-use zenoh_flow::Node;
 use zenoh_flow_perf::nodes::{IRNoOp, NoOp, ScalPingSource, ScalPongSink, LAT_PORT};
 
 static DEFAULT_FACTOR: &str = "0";
@@ -98,12 +97,11 @@ async fn main() {
     zf_graph
         .try_add_static_source(
             "source".into(),
-            None,
+            config.clone(),
             PortDescriptor {
                 port_id: String::from(LAT_PORT).into(),
                 port_type: String::from("lat").into(),
             },
-            source.initialize(&config).unwrap(),
             source,
         )
         .unwrap();
@@ -121,11 +119,11 @@ async fn main() {
             zf_graph
                 .try_add_static_sink(
                     "sink".into(),
+                    sink_config,
                     PortDescriptor {
                         port_id: String::from(LAT_PORT).into(),
                         port_type: String::from("lat").into(),
                     },
-                    sink.initialize(&sink_config).unwrap(),
                     sink,
                 )
                 .unwrap();
@@ -137,6 +135,7 @@ async fn main() {
                 zf_graph
                     .try_add_static_operator(
                         format!("op-{i}").into(),
+                        config.clone(),
                         vec![PortDescriptor {
                             port_id: String::from(LAT_PORT).into(),
                             port_type: String::from("lat").into(),
@@ -145,8 +144,6 @@ async fn main() {
                             port_id: String::from(LAT_PORT).into(),
                             port_type: String::from("lat").into(),
                         }],
-                        None,
-                        op.initialize(&None).unwrap(),
                         op,
                     )
                     .unwrap();
@@ -168,13 +165,12 @@ async fn main() {
             zf_graph
                 .try_add_static_operator(
                     "op-last".into(),
+                    config.clone(),
                     inputs,
                     vec![PortDescriptor {
                         port_id: String::from(LAT_PORT).into(),
                         port_type: String::from("lat").into(),
                     }],
-                    None,
-                    last_op.initialize(&None).unwrap(),
                     last_op,
                 )
                 .unwrap();
@@ -242,6 +238,7 @@ async fn main() {
                 zf_graph
                     .try_add_static_operator(
                         format!("op-{i}").into(),
+                        config.clone(),
                         vec![PortDescriptor {
                             port_id: String::from(LAT_PORT).into(),
                             port_type: String::from("lat").into(),
@@ -250,8 +247,6 @@ async fn main() {
                             port_id: String::from(LAT_PORT).into(),
                             port_type: String::from("lat").into(),
                         }],
-                        None,
-                        op.initialize(&None).unwrap(),
                         op,
                     )
                     .unwrap();
@@ -271,11 +266,11 @@ async fn main() {
                 zf_graph
                     .try_add_static_sink(
                         format!("sink-{i}").into(),
+                        sink_config.clone(),
                         PortDescriptor {
                             port_id: String::from(LAT_PORT).into(),
                             port_type: String::from("lat").into(),
                         },
-                        sink.initialize(&sink_config).unwrap(),
                         sink,
                     )
                     .unwrap();
@@ -323,7 +318,7 @@ async fn main() {
 
     // run the dataflow graph
 
-    let mut instance = DataflowInstance::try_instantiate(zf_graph).unwrap();
+    let mut instance = DataflowInstance::try_instantiate(zf_graph, ctx.hlc.clone()).unwrap();
 
     let mut sinks = instance.get_sinks();
     for id in sinks.drain(..) {
@@ -345,5 +340,5 @@ async fn main() {
         instance.start_node(id).await.unwrap()
     }
 
-    let () = std::future::pending().await;
+    std::future::pending::<()>().await;
 }

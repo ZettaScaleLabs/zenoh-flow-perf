@@ -19,7 +19,7 @@ pub struct LatSink;
 #[derive(ZFState, Debug, Clone)]
 struct LatSinkState {
     pipeline: u64,
-    interval: f64,
+    _interval: f64,
     msgs: u64,
 }
 
@@ -46,7 +46,7 @@ impl Sink for LatSink {
         };
 
         let state = LatSinkState {
-            interval,
+            _interval: interval,
             pipeline,
             msgs,
         };
@@ -54,19 +54,14 @@ impl Sink for LatSink {
         let input = inputs.get(LAT_PORT).unwrap()[0].clone();
 
         Arc::new(async move || {
-            if let Ok((_, msg)) = input.recv().await {
-                match msg {
-                    Message::Data(mut msg) => {
-                        let data = msg.get_inner_data().try_get::<Latency>()?;
-                        let now = get_epoch_us();
+            if let Ok((_, Message::Data(mut msg))) = input.recv().await {
+                let data = msg.get_inner_data().try_get::<Latency>()?;
+                let now = get_epoch_us();
 
-                        let elapsed = now - data.ts;
-                        let msgs = state.msgs;
-                        let pipeline = state.pipeline;
-                        println!("zenoh-flow,single,latency,{pipeline},8,{msgs},{elapsed},us");
-                    }
-                    _ => (),
-                }
+                let elapsed = now - data.ts;
+                let msgs = state.msgs;
+                let pipeline = state.pipeline;
+                println!("zenoh-flow,single,latency,{pipeline},8,{msgs},{elapsed},us");
             }
             Ok(())
         })
@@ -87,7 +82,7 @@ pub struct PongSink;
 #[derive(ZFState, Debug, Clone)]
 struct PongSinkState {
     pipeline: u64,
-    interval: f64,
+    _interval: f64,
     msgs: u64,
     session: Arc<zenoh::Session>,
     expr: ExprId,
@@ -139,7 +134,7 @@ impl Sink for PongSink {
             .unwrap();
 
         let state = PongSinkState {
-            interval,
+            _interval: interval,
             pipeline,
             msgs,
             session,
@@ -151,26 +146,21 @@ impl Sink for PongSink {
         let input = inputs.get(LAT_PORT).unwrap()[0].clone();
 
         Arc::new(async move || {
-            if let Ok((_, msg)) = input.recv().await {
-                match msg {
-                    Message::Data(mut msg) => {
-                        let data = msg.get_inner_data().try_get::<Latency>()?;
-                        let now = get_epoch_us();
+            if let Ok((_, Message::Data(mut msg))) = input.recv().await {
+                let data = msg.get_inner_data().try_get::<Latency>()?;
+                let now = get_epoch_us();
 
-                        let elapsed = now - data.ts;
-                        let msgs = state.msgs;
-                        let pipeline = state.pipeline;
-                        let layer = state.layer;
-                        println!("zenoh-flow,{layer},latency,{pipeline},8,{msgs},{elapsed},us");
+                let elapsed = now - data.ts;
+                let msgs = state.msgs;
+                let pipeline = state.pipeline;
+                let layer = state.layer;
+                println!("zenoh-flow,{layer},latency,{pipeline},8,{msgs},{elapsed},us");
 
-                        state
-                            .session
-                            .put(&state.expr, state.data.clone())
-                            .congestion_control(CongestionControl::Block)
-                            .await?;
-                    }
-                    _ => (),
-                }
+                state
+                    .session
+                    .put(&state.expr, state.data.clone())
+                    .congestion_control(CongestionControl::Block)
+                    .await?;
             }
             Ok(())
         })
@@ -191,7 +181,7 @@ pub struct ThrSink;
 struct SinkState {
     pub _payload_size: usize,
     pub accumulator: Arc<AtomicUsize>,
-    pub abort_handle: AbortHandle,
+    pub _abort_handle: AbortHandle,
 }
 
 #[async_trait]
@@ -250,19 +240,14 @@ impl Sink for ThrSink {
         let state = SinkState {
             _payload_size: payload_size,
             accumulator,
-            abort_handle,
+            _abort_handle: abort_handle,
         };
 
         let input = inputs.get(THR_PORT).unwrap()[0].clone();
 
         Arc::new(async move || {
-            if let Ok((_, msg)) = input.recv().await {
-                match msg {
-                    Message::Data(_) => {
-                        state.accumulator.fetch_add(1, Ordering::Relaxed);
-                    }
-                    _ => (),
-                }
+            if let Ok((_, Message::Data(_))) = input.recv().await {
+                state.accumulator.fetch_add(1, Ordering::Relaxed);
             }
             Ok(())
         })
@@ -283,7 +268,7 @@ pub struct ScalPongSink;
 #[derive(ZFState, Debug, Clone)]
 struct ScalPongSinkState {
     nodes: u64,
-    interval: f64,
+    _interval: f64,
     msgs: u64,
     session: Arc<zenoh::Session>,
     expr: ExprId,
@@ -355,7 +340,7 @@ impl Sink for ScalPongSink {
             .unwrap();
 
         let state = ScalPongSinkState {
-            interval,
+            _interval: interval,
             nodes,
             msgs,
             session,
@@ -368,29 +353,24 @@ impl Sink for ScalPongSink {
         let input = inputs.get(LAT_PORT).unwrap()[0].clone();
 
         Arc::new(async move || {
-            if let Ok((_, msg)) = input.recv().await {
-                match msg {
-                    Message::Data(mut msg) => {
-                        let data = msg.get_inner_data().try_get::<Latency>()?;
-                        let now = get_epoch_us();
+            if let Ok((_, Message::Data(mut msg))) = input.recv().await {
+                let data = msg.get_inner_data().try_get::<Latency>()?;
+                let now = get_epoch_us();
 
-                        let elapsed = match state.diff {
-                            true => now - data.ts,
-                            false => data.ts,
-                        };
-                        let msgs = state.msgs;
-                        let pipeline = state.nodes;
-                        let layer = &state.layer;
-                        println!("zenoh-flow,{layer},latency,{pipeline},8,{msgs},{elapsed},us");
+                let elapsed = match state.diff {
+                    true => now - data.ts,
+                    false => data.ts,
+                };
+                let msgs = state.msgs;
+                let pipeline = state.nodes;
+                let layer = &state.layer;
+                println!("zenoh-flow,{layer},latency,{pipeline},8,{msgs},{elapsed},us");
 
-                        state
-                            .session
-                            .put(&state.expr, state.data.clone())
-                            .congestion_control(CongestionControl::Block)
-                            .await?;
-                    }
-                    _ => (),
-                }
+                state
+                    .session
+                    .put(&state.expr, state.data.clone())
+                    .congestion_control(CongestionControl::Block)
+                    .await?;
             }
             Ok(())
         })

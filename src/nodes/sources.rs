@@ -37,7 +37,7 @@ impl Source for LatSource {
         Arc::new(async move || {
             async_std::task::sleep(Duration::from_secs_f64(state.interval)).await;
             let data = Data::from(Latency { ts: get_epoch_us() });
-            output.send(data,  None).await.unwrap();
+            output.send(data, None).await.unwrap();
             Ok(())
         })
     }
@@ -110,7 +110,7 @@ impl Source for PingSource {
             }
 
             let data = Data::from(Latency { ts: get_epoch_us() });
-            output.send(data,  None).await.unwrap();
+            output.send(data, None).await.unwrap();
             Ok(())
         })
     }
@@ -157,7 +157,7 @@ impl Source for ThrSource {
         Arc::new(async move || {
             let data = state.data.clone();
             let data = Data::from_arc::<ThrData>(data);
-            output.send(data,  None).await.unwrap();
+            output.send(data, None).await.unwrap();
             Ok(())
         })
     }
@@ -262,7 +262,7 @@ impl Source for ScalPingSource {
             }
 
             let data = Data::from(Latency { ts: get_epoch_us() });
-            output.send(data,  None).await.unwrap();
+            output.send(data, None).await.unwrap();
             Ok(())
         })
     }

@@ -57,6 +57,6 @@ async fn main() {
         task::sleep(Duration::from_secs_f64(interval)).await;
         let msg = Latency { ts: get_epoch_us() };
         sender_ping.send_async(msg).await.unwrap();
-        let _ = receiver_pong.recv_async().await.unwrap();
+        receiver_pong.recv_async().await.unwrap();
     }
 }

@@ -35,7 +35,7 @@ fn noop(input: Vec<u8>, hlc: Arc<HLC>) -> Vec<u8> {
     match deserialized_zf {
         Message::Data(mut data) => {
             let inner_data = data.get_inner_data().clone();
-            let zf_msg = Message::from_serdedata(inner_data, hlc.new_timestamp(), vec![], vec![]);
+            let zf_msg = Message::from_serdedata(inner_data, hlc.new_timestamp());
             zf_msg.serialize_bincode().unwrap()
         }
         _ => panic!("Should never enter here!"),
@@ -62,7 +62,7 @@ async fn main() {
         async_std::task::sleep(Duration::from_secs_f64(interval)).await;
         let msg = Latency { ts: get_epoch_us() };
         let data = Data::from::<Latency>(msg);
-        let zf_msg = Message::from_serdedata(data, hlc.new_timestamp(), vec![], vec![]);
+        let zf_msg = Message::from_serdedata(data, hlc.new_timestamp());
 
         let serialized_zf = zf_msg.serialize_bincode().unwrap();
 

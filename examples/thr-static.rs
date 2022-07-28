@@ -14,11 +14,11 @@
 
 use clap::Parser;
 use zenoh_flow::async_std::sync::Arc;
+use zenoh_flow::model::link::PortDescriptor;
 use zenoh_flow::model::{InputDescriptor, OutputDescriptor};
 use zenoh_flow::runtime::dataflow::instance::DataflowInstance;
 use zenoh_flow::runtime::dataflow::loader::{Loader, LoaderConfig};
 use zenoh_flow::runtime::RuntimeContext;
-use zenoh_flow::{model::link::PortDescriptor, Node};
 use zenoh_flow_perf::nodes::{ThrNoOp, ThrSink, ThrSource, THR_PORT};
 
 static DEFAULT_SIZE: &str = "8";

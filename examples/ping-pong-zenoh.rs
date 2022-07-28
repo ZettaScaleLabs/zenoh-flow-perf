@@ -51,7 +51,7 @@ async fn ping(interval: f64, session: zenoh::Session) {
 
         let msg = Latency { ts: get_epoch_us() };
         let data = Data::from::<Latency>(msg);
-        let msg = Message::from_serdedata(data, hlc.new_timestamp(), vec![], vec![]);
+        let msg = Message::from_serdedata(data, hlc.new_timestamp());
 
         let value = msg.serialize_bincode().unwrap();
 

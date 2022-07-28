@@ -3,11 +3,9 @@ use crate::{get_epoch_us, Latency};
 use async_trait::async_trait;
 use std::sync::Arc;
 use zenoh_flow::zenoh_flow_derive::ZFState;
-use zenoh_flow::{AsyncIteration, Configuration, Data, Inputs, Message, Node,
-    Operator, Outputs, ZFResult,
+use zenoh_flow::{
+    AsyncIteration, Configuration, Data, Inputs, Message, Node, Operator, Outputs, ZFResult,
 };
-
-
 
 // Latency OPERATOR
 
@@ -26,13 +24,11 @@ impl Operator for NoOp {
         let output = outputs.get(LAT_PORT).unwrap()[0].clone();
 
         Arc::new(async move || {
-            if let Ok((_, msg)) = input.recv().await {
-                match msg {
-                    Message::Data(mut msg) => {
-                        output.send(msg.get_inner_data().clone(), None).await.unwrap();
-                    }
-                    _ => (),
-                }
+            if let Ok((_, Message::Data(mut msg))) = input.recv().await {
+                output
+                    .send(msg.get_inner_data().clone(), None)
+                    .await
+                    .unwrap();
             }
             Ok(())
         })
@@ -51,7 +47,7 @@ impl Node for NoOp {
 #[derive(ZFState, Debug, Clone)]
 struct LatOpState {
     pipeline: u64,
-    interval: f64,
+    _interval: f64,
     msgs: u64,
     layer: String,
 }
@@ -93,7 +89,7 @@ impl Operator for NoOpPrint {
         };
 
         let state = LatOpState {
-            interval,
+            _interval: interval,
             pipeline,
             msgs,
             layer,
@@ -102,22 +98,15 @@ impl Operator for NoOpPrint {
         let input = inputs.get(LAT_PORT).unwrap()[0].clone();
 
         Arc::new(async move || {
-            if let Ok((_, msg)) = input.recv().await {
-                match msg {
-                    Message::Data(mut msg) => {
-                        let data = msg.get_inner_data().try_get::<Latency>()?;
-                        let now = get_epoch_us();
+            if let Ok((_, Message::Data(mut msg))) = input.recv().await {
+                let data = msg.get_inner_data().try_get::<Latency>()?;
+                let now = get_epoch_us();
 
-                        let elapsed = now - data.ts;
-                        let msgs = state.msgs;
-                        let pipeline = state.pipeline;
-                        let layer = state.layer;
-                        println!(
-                            "{layer},scenario,latency,pipeline,{msgs},{pipeline},{elapsed},us"
-                        );
-                    }
-                    _ => (),
-                }
+                let elapsed = now - data.ts;
+                let msgs = state.msgs;
+                let pipeline = state.pipeline;
+                let layer = state.layer;
+                println!("{layer},scenario,latency,pipeline,{msgs},{pipeline},{elapsed},us");
             }
             Ok(())
         })
@@ -147,13 +136,11 @@ impl Operator for ThrNoOp {
         let output = outputs.get(THR_PORT).unwrap()[0].clone();
 
         Arc::new(async move || {
-            if let Ok((_, msg)) = input.recv().await {
-                match msg {
-                    Message::Data(mut msg) => {
-                        output.send(msg.get_inner_data().clone(), None).await.unwrap();
-                    }
-                    _ => (),
-                }
+            if let Ok((_, Message::Data(mut msg))) = input.recv().await {
+                output
+                    .send(msg.get_inner_data().clone(), None)
+                    .await
+                    .unwrap();
             }
             Ok(())
         })
@@ -195,18 +182,13 @@ impl Operator for IRNoOp {
         let output = outputs.get(LAT_PORT).unwrap()[0].clone();
 
         Arc::new(async move || {
-            if let Ok((_, msg)) = input.recv().await {
-                match msg {
-                    Message::Data(mut msg) => {
-                        let data = msg.get_inner_data().try_get::<Latency>()?;
-                        let now = get_epoch_us();
+            if let Ok((_, Message::Data(mut msg))) = input.recv().await {
+                let data = msg.get_inner_data().try_get::<Latency>()?;
+                let now = get_epoch_us();
 
-                        let elapsed = now - data.ts;
-                        let data = Data::from(Latency { ts: elapsed });
-                        output.send(data, None).await.unwrap();
-                    }
-                    _ => (),
-                }
+                let elapsed = now - data.ts;
+                let data = Data::from(Latency { ts: elapsed });
+                output.send(data, None).await.unwrap();
             }
             Ok(())
         })

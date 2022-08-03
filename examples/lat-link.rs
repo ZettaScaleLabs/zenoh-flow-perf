@@ -52,7 +52,7 @@ async fn main() {
     let c_msgs = args.msgs;
     let pipeline_msgs = args.pipeline;
     task::spawn(async move {
-        while let Ok((_, Message::Data(mut msg))) = receiver_ping.recv().await {
+        while let Ok(Message::Data(mut msg)) = receiver_ping.recv().await {
             let data = msg.get_inner_data().try_get::<Latency>().unwrap();
             let now = get_epoch_us();
             let elapsed = now - data.ts;

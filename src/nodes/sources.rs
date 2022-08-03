@@ -38,22 +38,21 @@ impl Source for LatSource {
     async fn setup(
         &self,
         configuration: &Option<Configuration>,
-        outputs: Outputs,
-    ) -> Arc<dyn AsyncIteration> {
+        mut outputs: Outputs,
+    ) -> ZFResult<Arc<dyn AsyncIteration>> {
         let interval = match configuration {
             Some(conf) => conf["interval"].as_f64().unwrap(),
             None => 1.0f64,
         };
 
         let state = LatSourceState { interval };
-        let output = outputs.get(LAT_PORT).unwrap()[0].clone();
+        let output = outputs.remove(LAT_PORT).unwrap();
 
-        Arc::new(async move || {
+        Ok(Arc::new(async move || {
             async_std::task::sleep(Duration::from_secs_f64(state.interval)).await;
             let data = Data::from(Latency { ts: get_epoch_us() });
-            output.send(data, None).await.unwrap();
-            Ok(())
-        })
+            output.send(data, None).await
+        }))
     }
 }
 
@@ -91,8 +90,8 @@ impl Source for PingSource {
     async fn setup(
         &self,
         configuration: &Option<Configuration>,
-        outputs: Outputs,
-    ) -> Arc<dyn AsyncIteration> {
+        mut outputs: Outputs,
+    ) -> ZFResult<Arc<dyn AsyncIteration>> {
         let interval = match configuration {
             Some(conf) => conf["interval"].as_f64().unwrap(),
             None => 1.0f64,
@@ -113,9 +112,9 @@ impl Source for PingSource {
 
         let mut state = PingSourceState::new(interval, sub);
 
-        let output = outputs.get(LAT_PORT).unwrap()[0].clone();
+        let output = outputs.remove(LAT_PORT).unwrap();
 
-        Arc::new(async move || {
+        Ok(Arc::new(async move || {
             async_std::task::sleep(Duration::from_secs_f64(state.interval)).await;
             if !state.first {
                 let _ = state.sub.recv();
@@ -124,9 +123,8 @@ impl Source for PingSource {
             }
 
             let data = Data::from(Latency { ts: get_epoch_us() });
-            output.send(data, None).await.unwrap();
-            Ok(())
-        })
+            output.send(data, None).await
+        }))
     }
 }
 
@@ -152,8 +150,8 @@ impl Source for ThrSource {
     async fn setup(
         &self,
         configuration: &Option<Configuration>,
-        outputs: Outputs,
-    ) -> Arc<dyn AsyncIteration> {
+        mut outputs: Outputs,
+    ) -> ZFResult<Arc<dyn AsyncIteration>> {
         let payload_size = match configuration {
             Some(conf) => conf["payload_size"].as_u64().unwrap() as usize,
             None => 8usize,
@@ -166,14 +164,13 @@ impl Source for ThrSource {
         });
 
         let state = ThrSourceState { data };
-        let output = outputs.get(THR_PORT).unwrap()[0].clone();
+        let output = outputs.remove(THR_PORT).unwrap();
 
-        Arc::new(async move || {
+        Ok(Arc::new(async move || {
             let data = state.data.clone();
             let data = Data::from_arc::<ThrData>(data);
-            output.send(data, None).await.unwrap();
-            Ok(())
-        })
+            output.send(data, None).await
+        }))
     }
 }
 
@@ -211,8 +208,8 @@ impl Source for ScalPingSource {
     async fn setup(
         &self,
         configuration: &Option<Configuration>,
-        outputs: Outputs,
-    ) -> Arc<dyn AsyncIteration> {
+        mut outputs: Outputs,
+    ) -> ZFResult<Arc<dyn AsyncIteration>> {
         let interval = match configuration {
             Some(conf) => conf["interval"].as_f64().unwrap(),
             None => 1.0f64,
@@ -262,9 +259,9 @@ impl Source for ScalPingSource {
 
         let mut state = ScalPingSourceState::new(interval, subs);
 
-        let output = outputs.get(LAT_PORT).unwrap()[0].clone();
+        let output = outputs.remove(LAT_PORT).unwrap();
 
-        Arc::new(async move || {
+        Ok(Arc::new(async move || {
             async_std::task::sleep(Duration::from_secs_f64(state.interval)).await;
             async_std::task::sleep(Duration::from_secs_f64(state.interval)).await;
             if !state.first {
@@ -276,9 +273,8 @@ impl Source for ScalPingSource {
             }
 
             let data = Data::from(Latency { ts: get_epoch_us() });
-            output.send(data, None).await.unwrap();
-            Ok(())
-        })
+            output.send(data, None).await
+        }))
     }
 }
 

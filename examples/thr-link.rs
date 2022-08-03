@@ -64,7 +64,7 @@ async fn main() {
     });
 
     task::spawn(async move {
-        while let Ok((_, _data)) = receiver.recv().await {
+        while let Ok(_data) = receiver.recv().await {
             count.fetch_add(1, Ordering::AcqRel);
         }
     });

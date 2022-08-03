@@ -41,8 +41,8 @@ impl Sink for LatSink {
     async fn setup(
         &self,
         configuration: &Option<Configuration>,
-        inputs: Inputs,
-    ) -> Arc<dyn AsyncIteration> {
+        mut inputs: Inputs,
+    ) -> ZFResult<Arc<dyn AsyncIteration>> {
         let interval = match configuration {
             Some(conf) => conf["interval"].as_f64().unwrap(),
             None => 1.0f64,
@@ -64,10 +64,10 @@ impl Sink for LatSink {
             msgs,
         };
 
-        let input = inputs.get(LAT_PORT).unwrap()[0].clone();
+        let input = inputs.remove(LAT_PORT).unwrap();
 
-        Arc::new(async move || {
-            if let Ok((_, Message::Data(mut msg))) = input.recv().await {
+        Ok(Arc::new(async move || {
+            if let Ok(Message::Data(mut msg)) = input.recv().await {
                 let data = msg.get_inner_data().try_get::<Latency>()?;
                 let now = get_epoch_us();
 
@@ -77,7 +77,7 @@ impl Sink for LatSink {
                 println!("zenoh-flow,single,latency,{pipeline},8,{msgs},{elapsed},us");
             }
             Ok(())
-        })
+        }))
     }
 }
 
@@ -108,8 +108,8 @@ impl Sink for PongSink {
     async fn setup(
         &self,
         configuration: &Option<Configuration>,
-        inputs: Inputs,
-    ) -> Arc<dyn AsyncIteration> {
+        mut inputs: Inputs,
+    ) -> ZFResult<Arc<dyn AsyncIteration>> {
         let interval = match configuration {
             Some(conf) => conf["interval"].as_f64().unwrap(),
             None => 1.0f64,
@@ -156,10 +156,10 @@ impl Sink for PongSink {
             layer,
         };
 
-        let input = inputs.get(LAT_PORT).unwrap()[0].clone();
+        let input = inputs.remove(LAT_PORT).unwrap();
 
-        Arc::new(async move || {
-            if let Ok((_, Message::Data(mut msg))) = input.recv().await {
+        Ok(Arc::new(async move || {
+            if let Ok(Message::Data(mut msg)) = input.recv().await {
                 let data = msg.get_inner_data().try_get::<Latency>()?;
                 let now = get_epoch_us();
 
@@ -176,7 +176,7 @@ impl Sink for PongSink {
                     .await?;
             }
             Ok(())
-        })
+        }))
     }
 }
 #[async_trait]
@@ -202,8 +202,8 @@ impl Sink for ThrSink {
     async fn setup(
         &self,
         configuration: &Option<Configuration>,
-        inputs: Inputs,
-    ) -> Arc<dyn AsyncIteration> {
+        mut inputs: Inputs,
+    ) -> ZFResult<Arc<dyn AsyncIteration>> {
         let payload_size = match configuration {
             Some(conf) => conf["payload_size"].as_u64().unwrap() as usize,
             None => 8usize,
@@ -256,14 +256,14 @@ impl Sink for ThrSink {
             _abort_handle: abort_handle,
         };
 
-        let input = inputs.get(THR_PORT).unwrap()[0].clone();
+        let input = inputs.remove(THR_PORT).unwrap();
 
-        Arc::new(async move || {
-            if let Ok((_, Message::Data(_))) = input.recv().await {
+        Ok(Arc::new(async move || {
+            if let Ok(Message::Data(_)) = input.recv().await {
                 state.accumulator.fetch_add(1, Ordering::Relaxed);
             }
             Ok(())
-        })
+        }))
     }
 }
 
@@ -295,8 +295,8 @@ impl Sink for ScalPongSink {
     async fn setup(
         &self,
         configuration: &Option<Configuration>,
-        inputs: Inputs,
-    ) -> Arc<dyn AsyncIteration> {
+        mut inputs: Inputs,
+    ) -> ZFResult<Arc<dyn AsyncIteration>> {
         let mut rng = rand::thread_rng();
         let interval = match configuration {
             Some(conf) => conf["interval"].as_f64().unwrap(),
@@ -363,10 +363,10 @@ impl Sink for ScalPongSink {
             layer,
         };
 
-        let input = inputs.get(LAT_PORT).unwrap()[0].clone();
+        let input = inputs.remove(LAT_PORT).unwrap();
 
-        Arc::new(async move || {
-            if let Ok((_, Message::Data(mut msg))) = input.recv().await {
+        Ok(Arc::new(async move || {
+            if let Ok(Message::Data(mut msg)) = input.recv().await {
                 let data = msg.get_inner_data().try_get::<Latency>()?;
                 let now = get_epoch_us();
 
@@ -386,7 +386,7 @@ impl Sink for ScalPongSink {
                     .await?;
             }
             Ok(())
-        })
+        }))
     }
 }
 

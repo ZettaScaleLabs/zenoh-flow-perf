@@ -12,27 +12,26 @@
 ##   ADLINK zenoh team, <zenoh@adlink-labs.tech>
 ##
 
-from zenoh_flow import Inputs, Operator, Outputs
+from zenoh_flow.interfaces import Operator
+from zenoh_flow import DataReceiver, DataSender
+from typing import Dict, Any, Callable
 
-class MyOp(Operator):
-    def initialize(self, configuration):
+class NoOp(Operator):
+
+    def setup(self, configuration: Dict[str, Any], inputs: Dict[str, DataReceiver], outputs: Dict[str, DataSender]) -> Callable[[], Any]:
+        output = outputs.get('Data', None)
+        in_stream = inputs.get('Data', None)
+        return lambda: run(in_stream, output)
+
+    def finalize(self):
         return None
 
-    def finalize(self, state):
-        return None
+async def run(in_stream, out_stream):
+    data_msg = await in_stream.recv()
+    await out_stream.send(data_msg.data)
+    return None
 
-    def input_rule(self, _ctx, state, tokens):
-        return True
-
-    def output_rule(self, _ctx, _state, outputs, _deadline_miss):
-        return outputs
-
-    def run(self, _ctx, _state, inputs):
-        # Getting the inputs
-        data = inputs.get('Data').data
-        outputs = {'Data' : data}
-        return outputs
 
 
 def register():
-    return MyOp
+    return NoOp

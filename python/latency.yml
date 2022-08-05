@@ -1,37 +1,21 @@
 flow: PythonLatency
 operators:
   - id : NoOp
-    uri: file:///home/gabri/Workspace/zenoh-flow-perf/python//noop.py
-    inputs:
-      - id: Data
-        type: lat
-    outputs:
-      - id: Data
-        type: lat
+    descriptor : ./python/noop.yml
 sources:
-  - id : Ping
-    uri: file:///home/gabri/Workspace/zenoh-flow-perf/python/ping-src.py
-    configuration:
-      msgs: 60
-      size: 8000000
-    output:
-        id: Ping
-        type: lat
+  - id : LatencySrc
+    descriptor : ./python/source.yml
 sinks:
-  - id : Pong
-    uri: file:///home/gabri/Workspace/zenoh-flow-perf/python/pong-sink.py
-    configuration:
-      msgs: 60
-      size: 8000000
-    input:
-        id: Pong
-        type: lat
+  - id : LatencyPrint
+    descriptor : ./python/sink.yml
+    # configuration:
+    #   msgs: 10000
+    #   size: 16777216
 
-# # Src->Op->Sink
 links:
 - from:
-    node : Ping
-    output : Ping
+    node : LatencySrc
+    output : Value
   to:
     node : NoOp
     input : Data
@@ -39,5 +23,5 @@ links:
     node : NoOp
     output : Data
   to:
-    node : Pong
-    input : Pong
+    node : LatencyPrint
+    input : Value

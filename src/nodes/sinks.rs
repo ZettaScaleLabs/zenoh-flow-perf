@@ -67,7 +67,7 @@ impl Sink for LatSink {
         let input = inputs.remove(LAT_PORT).unwrap();
 
         Ok(Arc::new(async move || {
-            if let Ok(Message::Data(mut msg)) = input.recv().await {
+            if let Ok(Message::Data(mut msg)) = input.recv_async().await {
                 let data = msg.get_inner_data().try_get::<Latency>()?;
                 let now = get_epoch_us();
 
@@ -159,7 +159,7 @@ impl Sink for PongSink {
         let input = inputs.remove(LAT_PORT).unwrap();
 
         Ok(Arc::new(async move || {
-            if let Ok(Message::Data(mut msg)) = input.recv().await {
+            if let Ok(Message::Data(mut msg)) = input.recv_async().await {
                 let data = msg.get_inner_data().try_get::<Latency>()?;
                 let now = get_epoch_us();
 
@@ -259,7 +259,7 @@ impl Sink for ThrSink {
         let input = inputs.remove(THR_PORT).unwrap();
 
         Ok(Arc::new(async move || {
-            if let Ok(Message::Data(_)) = input.recv().await {
+            if let Ok(Message::Data(_)) = input.recv_async().await {
                 state.accumulator.fetch_add(1, Ordering::Relaxed);
             }
             Ok(())
@@ -366,7 +366,7 @@ impl Sink for ScalPongSink {
         let input = inputs.remove(LAT_PORT).unwrap();
 
         Ok(Arc::new(async move || {
-            if let Ok(Message::Data(mut msg)) = input.recv().await {
+            if let Ok(Message::Data(mut msg)) = input.recv_async().await {
                 let data = msg.get_inner_data().try_get::<Latency>()?;
                 let now = get_epoch_us();
 

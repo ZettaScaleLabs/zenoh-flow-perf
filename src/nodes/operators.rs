@@ -38,9 +38,9 @@ impl Operator for NoOp {
         let output = outputs.remove(LAT_PORT).unwrap();
 
         Ok(Arc::new(async move || {
-            if let Ok(Message::Data(mut msg)) = input.recv().await {
+            if let Ok(Message::Data(mut msg)) = input.recv_async().await {
                 output
-                    .send(msg.get_inner_data().clone(), None)
+                    .send_async(msg.get_inner_data().clone(), None)
                     .await
                     .unwrap();
             }
@@ -112,7 +112,7 @@ impl Operator for NoOpPrint {
         let input = inputs.remove(LAT_PORT).unwrap();
 
         Ok(Arc::new(async move || {
-            if let Ok(Message::Data(mut msg)) = input.recv().await {
+            if let Ok(Message::Data(mut msg)) = input.recv_async().await {
                 let data = msg.get_inner_data().try_get::<Latency>()?;
                 let now = get_epoch_us();
 
@@ -150,9 +150,9 @@ impl Operator for ThrNoOp {
         let output = outputs.remove(THR_PORT).unwrap();
 
         Ok(Arc::new(async move || {
-            if let Ok(Message::Data(mut msg)) = input.recv().await {
+            if let Ok(Message::Data(mut msg)) = input.recv_async().await {
                 output
-                    .send(msg.get_inner_data().clone(), None)
+                    .send_async(msg.get_inner_data().clone(), None)
                     .await
                     .unwrap();
             }
@@ -195,13 +195,13 @@ impl Operator for IRNoOp {
         let input = inputs.remove("Data0").unwrap();
         let output = outputs.remove(LAT_PORT).unwrap();
         Ok(Arc::new(async move || {
-            if let Ok(Message::Data(mut msg)) = input.recv().await {
+            if let Ok(Message::Data(mut msg)) = input.recv_async().await {
                 let data = msg.get_inner_data().try_get::<Latency>()?;
                 let now = get_epoch_us();
 
                 let elapsed = now - data.ts;
                 let data = Data::from(Latency { ts: elapsed });
-                output.send(data, None).await.unwrap();
+                output.send_async(data, None).await.unwrap();
             }
             Ok(())
         }))

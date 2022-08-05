@@ -1,0 +1,11 @@
+id: PySource
+uri: file://./python/source.py
+output:
+  id: Value
+  type: usize
+tags: []
+# configuration:
+#   msgs: 15
+#   size: 16777216
+configuration:
+  msgs: 10000

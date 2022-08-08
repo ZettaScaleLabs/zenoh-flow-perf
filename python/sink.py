@@ -28,7 +28,6 @@ class MyState:
             self.msgs = int(configuration['msgs'])
         if configuration is not None and configuration.get('size', None) is not None:
             self.size = int(configuration['size'])
-        print("Config {configuration}")
 
 
 class MySink(Sink):

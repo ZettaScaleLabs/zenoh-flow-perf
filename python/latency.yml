@@ -8,9 +8,10 @@ sources:
 sinks:
   - id : LatencyPrint
     descriptor : ./python/sink.yml
-    # configuration:
-    #   msgs: 10000
-    #   size: 16777216
+
+configuration:
+  msgs: 10000
+  size: 16777216
 
 links:
 - from:

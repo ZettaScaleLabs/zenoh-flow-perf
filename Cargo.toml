@@ -1,6 +1,6 @@
 [package]
 name = "zenoh-flow-perf"
-version = "0.1.0"
+version = "0.4.0"
 repository = "https://github.com/eclipse-zenoh/zenoh-flow"
 homepage = "http://zenoh.io"
 authors = ["kydos <angelo@icorsaro.net>",
@@ -16,7 +16,7 @@ readme = "README.md"
 
 [dependencies]
 zenoh-flow = { git = "https://github.com/ZettaScaleLabs/zenoh-flow.git", branch = "dev/v0.4.0" }
-# zenoh-flow = { path = "../zf-zetta/zenoh-flow" }
+
 
 env_logger = "0.9"
 serde = { version = "1.0.55", features = ["derive"] }

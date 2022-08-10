@@ -22,7 +22,7 @@ use zenoh::prelude::*;
 use zenoh::publication::CongestionControl;
 use zenoh_flow::async_std::sync::Arc;
 use zenoh_flow::zenoh_flow_derive::ZFState;
-use zenoh_flow::{AsyncIteration, Configuration, Inputs, Message, Node, Sink, ZFResult};
+use zenoh_flow::{AsyncIteration, Configuration, Inputs, Message, Node, Sink, ZFResult, Context};
 
 use super::{LAT_PORT, THR_PORT};
 
@@ -40,6 +40,7 @@ struct LatSinkState {
 impl Sink for LatSink {
     async fn setup(
         &self,
+        _ctx: &mut Context,
         configuration: &Option<Configuration>,
         mut inputs: Inputs,
     ) -> ZFResult<Arc<dyn AsyncIteration>> {
@@ -107,6 +108,7 @@ struct PongSinkState {
 impl Sink for PongSink {
     async fn setup(
         &self,
+        _ctx: &mut Context,
         configuration: &Option<Configuration>,
         mut inputs: Inputs,
     ) -> ZFResult<Arc<dyn AsyncIteration>> {
@@ -201,6 +203,7 @@ struct SinkState {
 impl Sink for ThrSink {
     async fn setup(
         &self,
+        _ctx: &mut Context,
         configuration: &Option<Configuration>,
         mut inputs: Inputs,
     ) -> ZFResult<Arc<dyn AsyncIteration>> {
@@ -294,6 +297,7 @@ struct ScalPongSinkState {
 impl Sink for ScalPongSink {
     async fn setup(
         &self,
+        _ctx: &mut Context,
         configuration: &Option<Configuration>,
         mut inputs: Inputs,
     ) -> ZFResult<Arc<dyn AsyncIteration>> {

@@ -15,7 +15,7 @@
 use clap::Parser;
 use std::time::Duration;
 use zenoh_flow::async_std::task;
-use zenoh_flow::runtime::dataflow::instance::link::link;
+// use zenoh_flow::runtime::dataflow::instance::link::link;
 use zenoh_flow::Data;
 use zenoh_flow::Message;
 use zenoh_flow_perf::{get_epoch_us, CriterionData, Latency};
@@ -34,47 +34,48 @@ struct CallArgs {
 
 #[async_std::main]
 async fn main() {
-    env_logger::init();
+    // env_logger::init();
 
-    let args = CallArgs::parse();
-    let hlc = async_std::sync::Arc::new(uhlc::HLC::default());
+    // let args = CallArgs::parse();
+    // let hlc = async_std::sync::Arc::new(uhlc::HLC::default());
 
-    let send_id = String::from("0");
-    let recv_id = String::from("10");
-    let (sender_ping, receiver_ping) = link(
-        None,
-        send_id.clone().into(),
-        recv_id.clone().into(),
-        hlc.clone(),
-    );
-    let (sender_pong, receiver_pong) = link(None, recv_id.into(), send_id.into(), hlc.clone());
+    // let send_id = String::from("0");
+    // let recv_id = String::from("10");
+    // let (sender_ping, receiver_ping) = link(
+    //     None,
+    //     send_id.clone().into(),
+    //     recv_id.clone().into(),
+    //     hlc.clone(),
+    // );
+    // let (sender_pong, receiver_pong) = link(None, recv_id.into(), send_id.into(), hlc.clone());
 
-    let c_msgs = args.msgs;
-    let pipeline_msgs = args.pipeline;
-    task::spawn(async move {
-        while let Ok(Message::Data(mut msg)) = receiver_ping.recv().await {
-            let data = msg.get_inner_data().try_get::<Latency>().unwrap();
-            let now = get_epoch_us();
-            let elapsed = now - data.ts;
+    // let c_msgs = args.msgs;
+    // let pipeline_msgs = args.pipeline;
+    // task::spawn(async move {
+    //     while let Ok(Message::Data(mut msg)) = receiver_ping.recv().await {
+    //         let data = msg.get_inner_data().try_get::<Latency>().unwrap();
+    //         let now = get_epoch_us();
+    //         let elapsed = now - data.ts;
 
-            // layer,scenario name,test kind, test name, payload size, msg/s, pipeline size, latency, unit
-            println!(
-                "zf-link,scenario-name,latency,pipeline,{c_msgs},{pipeline_msgs},{elapsed},us"
-            );
+    //         // layer,scenario name,test kind, test name, payload size, msg/s, pipeline size, latency, unit
+    //         println!(
+    //             "zf-link,scenario-name,latency,pipeline,{c_msgs},{pipeline_msgs},{elapsed},us"
+    //         );
 
-            sender_pong
-                .send(Data::from(CriterionData { d: 0 }), Some(0u64))
-                .await
-                .unwrap();
-        }
-    });
+    //         sender_pong
+    //             .send(Data::from(CriterionData { d: 0 }), Some(0u64))
+    //             .await
+    //             .unwrap();
+    //     }
+    // });
 
-    let interval = 1.0 / (args.msgs as f64);
+    // let interval = 1.0 / (args.msgs as f64);
 
-    loop {
-        task::sleep(Duration::from_secs_f64(interval)).await;
-        let msg = Data::from(Latency { ts: get_epoch_us() });
-        sender_ping.send(msg, None).await.unwrap();
-        let _ = receiver_pong.recv().await.unwrap();
-    }
+    // loop {
+    //     task::sleep(Duration::from_secs_f64(interval)).await;
+    //     let msg = Data::from(Latency { ts: get_epoch_us() });
+    //     sender_ping.send(msg, None).await.unwrap();
+    //     let _ = receiver_pong.recv().await.unwrap();
+    // }
+    println!("Not yet...")
 }

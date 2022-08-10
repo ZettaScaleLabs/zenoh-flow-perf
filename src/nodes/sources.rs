@@ -20,7 +20,7 @@ use zenoh::prelude::*;
 use zenoh::subscriber::Subscriber;
 use zenoh_flow::async_std::sync::Arc;
 use zenoh_flow::zenoh_flow_derive::ZFState;
-use zenoh_flow::{AsyncIteration, Configuration, Data, Node, Outputs, Source, ZFResult};
+use zenoh_flow::{AsyncIteration, Configuration, Data, Node, Outputs, Source, ZFResult, Context};
 
 use super::{LAT_PORT, THR_PORT};
 
@@ -37,6 +37,7 @@ struct LatSourceState {
 impl Source for LatSource {
     async fn setup(
         &self,
+        _ctx: &mut Context,
         configuration: &Option<Configuration>,
         mut outputs: Outputs,
     ) -> ZFResult<Arc<dyn AsyncIteration>> {
@@ -89,6 +90,7 @@ impl PingSourceState {
 impl Source for PingSource {
     async fn setup(
         &self,
+        _ctx: &mut Context,
         configuration: &Option<Configuration>,
         mut outputs: Outputs,
     ) -> ZFResult<Arc<dyn AsyncIteration>> {
@@ -149,6 +151,7 @@ struct ThrSourceState {
 impl Source for ThrSource {
     async fn setup(
         &self,
+        _ctx: &mut Context,
         configuration: &Option<Configuration>,
         mut outputs: Outputs,
     ) -> ZFResult<Arc<dyn AsyncIteration>> {
@@ -207,6 +210,7 @@ impl ScalPingSourceState {
 impl Source for ScalPingSource {
     async fn setup(
         &self,
+        _ctx: &mut Context,
         configuration: &Option<Configuration>,
         mut outputs: Outputs,
     ) -> ZFResult<Arc<dyn AsyncIteration>> {

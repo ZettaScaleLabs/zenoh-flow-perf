@@ -19,6 +19,7 @@ use std::sync::Arc;
 use zenoh_flow::zenoh_flow_derive::ZFState;
 use zenoh_flow::{
     AsyncIteration, Configuration, Data, Inputs, Message, Node, Operator, Outputs, ZFResult,
+    Context
 };
 
 // Latency OPERATOR
@@ -30,6 +31,7 @@ pub struct NoOp;
 impl Operator for NoOp {
     async fn setup(
         &self,
+        _ctx: &mut Context,
         _configuration: &Option<Configuration>,
         mut inputs: Inputs,
         mut outputs: Outputs,
@@ -73,6 +75,7 @@ pub struct NoOpPrint;
 impl Operator for NoOpPrint {
     async fn setup(
         &self,
+        _ctx: &mut Context,
         configuration: &Option<Configuration>,
         mut inputs: Inputs,
         mut _outputs: Outputs,
@@ -142,6 +145,7 @@ pub struct ThrNoOp;
 impl Operator for ThrNoOp {
     async fn setup(
         &self,
+        _ctx: &mut Context,
         _configuration: &Option<Configuration>,
         mut inputs: Inputs,
         mut outputs: Outputs,
@@ -181,6 +185,7 @@ pub struct IRNoOp;
 impl Operator for IRNoOp {
     async fn setup(
         &self,
+        _ctx: &mut Context,
         configuration: &Option<Configuration>,
         mut inputs: Inputs,
         mut outputs: Outputs,

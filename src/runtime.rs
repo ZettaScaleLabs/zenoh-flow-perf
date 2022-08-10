@@ -17,10 +17,22 @@ use std::fs::read_to_string;
 use zenoh_flow::async_std::sync::Arc;
 use zenoh_flow::runtime::dataflow::loader::{Loader, LoaderConfig};
 use zenoh_flow::runtime::RuntimeContext;
+use std::path::Path;
+use std::fs::File;
+use std::io::Write;
 
 pub enum Descriptor {
     Composed(String),
     Flatten(String),
+}
+
+fn _write_record_to_file(
+    record: zenoh_flow::model::dataflow::record::DataFlowRecord,
+    filename: &str,
+) {
+    let path = Path::new(filename);
+    let mut write_file = File::create(path).unwrap();
+    write!(write_file, "{}", record.to_yaml().unwrap()).unwrap();
 }
 
 pub async fn runtime(
@@ -82,6 +94,8 @@ pub async fn runtime(
     let dfr =
         zenoh_flow::model::dataflow::record::DataFlowRecord::try_from((mapped, uuid::Uuid::nil()))
             .unwrap();
+
+    _write_record_to_file(dfr.clone(), &format!("{}-record.yaml", dfr.flow));
 
     // creating dataflow
     let dataflow = zenoh_flow::runtime::dataflow::Dataflow::try_new(ctx.clone(), dfr).unwrap();

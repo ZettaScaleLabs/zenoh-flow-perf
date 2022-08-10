@@ -35,11 +35,11 @@ impl Operator for NoOp {
         _configuration: &Option<Configuration>,
         mut inputs: Inputs,
         mut outputs: Outputs,
-    ) -> ZFResult<Arc<dyn AsyncIteration>> {
+    ) -> ZFResult<Option<Arc<dyn AsyncIteration>>> {
         let input = inputs.remove(LAT_PORT).unwrap();
         let output = outputs.remove(LAT_PORT).unwrap();
 
-        Ok(Arc::new(async move || {
+        Ok(Some(Arc::new(async move || {
             if let Ok(Message::Data(mut msg)) = input.recv_async().await {
                 output
                     .send_async(msg.get_inner_data().clone(), None)
@@ -47,7 +47,7 @@ impl Operator for NoOp {
                     .unwrap();
             }
             Ok(())
-        }))
+        })))
     }
 }
 
@@ -79,7 +79,7 @@ impl Operator for NoOpPrint {
         configuration: &Option<Configuration>,
         mut inputs: Inputs,
         mut _outputs: Outputs,
-    ) -> ZFResult<Arc<dyn AsyncIteration>> {
+    ) -> ZFResult<Option<Arc<dyn AsyncIteration>>>  {
         let interval = match configuration {
             Some(conf) => conf["interval"].as_f64().unwrap(),
             None => 1.0f64,
@@ -114,7 +114,7 @@ impl Operator for NoOpPrint {
 
         let input = inputs.remove(LAT_PORT).unwrap();
 
-        Ok(Arc::new(async move || {
+        Ok(Some(Arc::new(async move || {
             if let Ok(Message::Data(mut msg)) = input.recv_async().await {
                 let data = msg.get_inner_data().try_get::<Latency>()?;
                 let now = get_epoch_us();
@@ -126,7 +126,7 @@ impl Operator for NoOpPrint {
                 println!("{layer},scenario,latency,pipeline,{msgs},{pipeline},{elapsed},us");
             }
             Ok(())
-        }))
+        })))
     }
 }
 
@@ -149,11 +149,11 @@ impl Operator for ThrNoOp {
         _configuration: &Option<Configuration>,
         mut inputs: Inputs,
         mut outputs: Outputs,
-    ) -> ZFResult<Arc<dyn AsyncIteration>> {
+    ) -> ZFResult<Option<Arc<dyn AsyncIteration>>>  {
         let input = inputs.remove(THR_PORT).unwrap();
         let output = outputs.remove(THR_PORT).unwrap();
 
-        Ok(Arc::new(async move || {
+        Ok(Some(Arc::new(async move || {
             if let Ok(Message::Data(mut msg)) = input.recv_async().await {
                 output
                     .send_async(msg.get_inner_data().clone(), None)
@@ -161,7 +161,7 @@ impl Operator for ThrNoOp {
                     .unwrap();
             }
             Ok(())
-        }))
+        })))
     }
 }
 
@@ -189,7 +189,7 @@ impl Operator for IRNoOp {
         configuration: &Option<Configuration>,
         mut inputs: Inputs,
         mut outputs: Outputs,
-    ) -> ZFResult<Arc<dyn AsyncIteration>> {
+    ) -> ZFResult<Option<Arc<dyn AsyncIteration>>>  {
         let op_inputs = match configuration {
             Some(conf) => conf["inputs"].as_u64().unwrap(),
             None => 1,
@@ -199,7 +199,7 @@ impl Operator for IRNoOp {
 
         let input = inputs.remove("Data0").unwrap();
         let output = outputs.remove(LAT_PORT).unwrap();
-        Ok(Arc::new(async move || {
+        Ok(Some(Arc::new(async move || {
             if let Ok(Message::Data(mut msg)) = input.recv_async().await {
                 let data = msg.get_inner_data().try_get::<Latency>()?;
                 let now = get_epoch_us();
@@ -209,7 +209,7 @@ impl Operator for IRNoOp {
                 output.send_async(data, None).await.unwrap();
             }
             Ok(())
-        }))
+        })))
     }
 }
 

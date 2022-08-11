@@ -17,7 +17,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use zenoh_flow::async_std::sync::Arc;
 use zenoh_flow::async_std::task;
 // use zenoh_flow::runtime::dataflow::instance::link::link;
-use zenoh_flow::Data;
+use zenoh_flow::prelude::*;
 
 static DEFAULT_INT: &str = "1";
 static DEFAULT_SIZE: &str = "8";

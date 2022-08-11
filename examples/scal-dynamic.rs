@@ -20,7 +20,7 @@ use zenoh_flow::model::dataflow::descriptor::FlattenDataFlowDescriptor;
 use zenoh_flow::model::link::{LinkDescriptor, PortDescriptor};
 use zenoh_flow::model::node::{SimpleOperatorDescriptor, SinkDescriptor, SourceDescriptor};
 use zenoh_flow::model::{InputDescriptor, OutputDescriptor};
-use zenoh_flow::{NodeId, RuntimeId};
+use zenoh_flow::types::{NodeId, RuntimeId};
 use zenoh_flow_perf::nodes::LAT_PORT;
 use zenoh_flow_perf::runtime::Descriptor;
 static DEFAULT_FACTOR: &str = "0";

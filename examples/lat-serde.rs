@@ -15,8 +15,8 @@
 use clap::Parser;
 use std::time::Duration;
 use uhlc::HLC;
-use zenoh_flow::async_std::sync::Arc;
-use zenoh_flow::{Data, Message};
+use std::sync::Arc;
+use zenoh_flow::prelude::*;
 use zenoh_flow_perf::{get_epoch_us, Latency};
 
 static DEFAULT_PIPELINE: &str = "1";
@@ -61,7 +61,7 @@ async fn main() {
     loop {
         async_std::task::sleep(Duration::from_secs_f64(interval)).await;
         let msg = Latency { ts: get_epoch_us() };
-        let data = Data::from::<Latency>(msg);
+        let data = Data::from(msg);
         let zf_msg = Message::from_serdedata(data, hlc.new_timestamp());
 
         let serialized_zf = zf_msg.serialize_bincode().unwrap();

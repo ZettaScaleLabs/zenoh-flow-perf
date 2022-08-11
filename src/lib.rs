@@ -11,15 +11,14 @@
 // Contributors:
 //   ZettaScale zenoh team, <zenoh@zettascale.tech>
 //
-#![feature(async_closure)]
 
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
+use zenoh_flow::prelude::*;
 use zenoh_flow::serde::{Deserialize, Serialize};
 use zenoh_flow::zenoh_flow_derive::ZFData;
-use zenoh_flow::{Deserializable, ZFData, ZFError, ZFResult};
 
 pub mod nodes;
 pub mod runtime;
@@ -36,7 +35,7 @@ pub struct ThrData {
 }
 
 impl ZFData for ThrData {
-    fn try_serialize(&self) -> zenoh_flow::ZFResult<Vec<u8>> {
+    fn try_serialize(&self) -> ZFResult<Vec<u8>> {
         Ok(bincode::serialize(self)
             .map_err(|_| ZFError::SerializationError)?
             .to_vec())
@@ -59,7 +58,7 @@ pub struct LatData {
 }
 
 impl ZFData for LatData {
-    fn try_serialize(&self) -> zenoh_flow::ZFResult<Vec<u8>> {
+    fn try_serialize(&self) -> ZFResult<Vec<u8>> {
         Ok(bincode::serialize(self)
             .map_err(|_| ZFError::SerializationError)?
             .to_vec())
@@ -88,7 +87,7 @@ pub struct Latency {
 }
 
 impl ZFData for Latency {
-    fn try_serialize(&self) -> zenoh_flow::ZFResult<Vec<u8>> {
+    fn try_serialize(&self) -> ZFResult<Vec<u8>> {
         Ok(bincode::serialize(self)
             .map_err(|_| ZFError::SerializationError)?
             .to_vec())
@@ -110,7 +109,7 @@ pub struct CriterionData {
 }
 
 impl ZFData for CriterionData {
-    fn try_serialize(&self) -> zenoh_flow::ZFResult<Vec<u8>> {
+    fn try_serialize(&self) -> ZFResult<Vec<u8>> {
         Ok(bincode::serialize(self)
             .map_err(|_| ZFError::SerializationError)?
             .to_vec())

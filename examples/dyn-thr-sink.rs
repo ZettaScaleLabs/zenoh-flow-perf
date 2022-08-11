@@ -13,8 +13,7 @@
 //
 
 use zenoh_flow::async_std::sync::Arc;
-use zenoh_flow::Sink;
-use zenoh_flow::{export_sink, types::ZFResult};
+use zenoh_flow::prelude::*;
 use zenoh_flow_perf::nodes::ThrSink;
 
 export_sink!(register);

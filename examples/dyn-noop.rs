@@ -12,9 +12,8 @@
 //   ZettaScale zenoh team, <zenoh@zettascale.tech>
 //
 
-use zenoh_flow::async_std::sync::Arc;
-use zenoh_flow::{export_operator, types::ZFResult, Operator};
-
+use std::sync::Arc;
+use zenoh_flow::prelude::*;
 use zenoh_flow_perf::nodes::NoOp;
 
 export_operator!(register);

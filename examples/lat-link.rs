@@ -16,8 +16,7 @@ use clap::Parser;
 use std::time::Duration;
 use zenoh_flow::async_std::task;
 // use zenoh_flow::runtime::dataflow::instance::link::link;
-use zenoh_flow::Data;
-use zenoh_flow::Message;
+use zenoh_flow::prelude::*;
 use zenoh_flow_perf::{get_epoch_us, CriterionData, Latency};
 
 static DEFAULT_PIPELINE: &str = "1";

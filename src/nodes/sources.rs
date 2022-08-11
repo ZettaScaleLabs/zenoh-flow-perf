@@ -15,12 +15,11 @@
 use crate::{get_epoch_us, Latency, ThrData};
 
 use async_trait::async_trait;
+use std::sync::Arc;
 use std::time::Duration;
 use zenoh::prelude::*;
 use zenoh::subscriber::Subscriber;
-use zenoh_flow::async_std::sync::Arc;
-use zenoh_flow::zenoh_flow_derive::ZFState;
-use zenoh_flow::{AsyncIteration, Configuration, Data, Node, Outputs, Source, ZFResult, Context};
+use zenoh_flow::prelude::*;
 
 use super::{LAT_PORT, THR_PORT};
 
@@ -28,7 +27,7 @@ use super::{LAT_PORT, THR_PORT};
 #[derive(Debug)]
 pub struct LatSource;
 
-#[derive(Debug, ZFState, Clone)]
+#[derive(Debug, Clone)]
 struct LatSourceState {
     interval: f64,
 }
@@ -40,7 +39,7 @@ impl Source for LatSource {
         _ctx: &mut Context,
         configuration: &Option<Configuration>,
         mut outputs: Outputs,
-    ) -> ZFResult<Option<Arc<dyn AsyncIteration>>>  {
+    ) -> ZFResult<Option<Arc<dyn AsyncIteration>>> {
         let interval = match configuration {
             Some(conf) => conf["interval"].as_f64().unwrap(),
             None => 1.0f64,
@@ -49,18 +48,11 @@ impl Source for LatSource {
         let state = LatSourceState { interval };
         let output = outputs.remove(LAT_PORT).unwrap();
 
-        Ok(Some(Arc::new(async move || {
+        Ok(Some(Arc::new(move || async move {
             async_std::task::sleep(Duration::from_secs_f64(state.interval)).await;
             let data = Data::from(Latency { ts: get_epoch_us() });
             output.send_async(data, None).await
         })))
-    }
-}
-
-#[async_trait]
-impl Node for LatSource {
-    async fn finalize(&self) -> ZFResult<()> {
-        Ok(())
     }
 }
 
@@ -69,7 +61,7 @@ impl Node for LatSource {
 #[derive(Debug)]
 pub struct PingSource;
 
-#[derive(Debug, ZFState, Clone)]
+#[derive(Debug, Clone)]
 struct PingSourceState {
     interval: f64,
     sub: Arc<Subscriber<'static>>,
@@ -93,7 +85,7 @@ impl Source for PingSource {
         _ctx: &mut Context,
         configuration: &Option<Configuration>,
         mut outputs: Outputs,
-    ) -> ZFResult<Option<Arc<dyn AsyncIteration>>>  {
+    ) -> ZFResult<Option<Arc<dyn AsyncIteration>>> {
         let interval = match configuration {
             Some(conf) => conf["interval"].as_f64().unwrap(),
             None => 1.0f64,
@@ -116,7 +108,7 @@ impl Source for PingSource {
 
         let output = outputs.remove(LAT_PORT).unwrap();
 
-        Ok(Some(Arc::new(async move || {
+        Ok(Some(Arc::new(move || async move {
             async_std::task::sleep(Duration::from_secs_f64(state.interval)).await;
             if !state.first {
                 let _ = state.sub.recv();
@@ -130,19 +122,12 @@ impl Source for PingSource {
     }
 }
 
-#[async_trait]
-impl Node for PingSource {
-    async fn finalize(&self) -> ZFResult<()> {
-        Ok(())
-    }
-}
-
 // THR SOURCE
 
 #[derive(Debug)]
 pub struct ThrSource;
 
-#[derive(Debug, ZFState, Clone)]
+#[derive(Debug, Clone)]
 struct ThrSourceState {
     pub data: Arc<ThrData>,
 }
@@ -154,7 +139,7 @@ impl Source for ThrSource {
         _ctx: &mut Context,
         configuration: &Option<Configuration>,
         mut outputs: Outputs,
-    ) -> ZFResult<Option<Arc<dyn AsyncIteration>>>  {
+    ) -> ZFResult<Option<Arc<dyn AsyncIteration>>> {
         let payload_size = match configuration {
             Some(conf) => conf["payload_size"].as_u64().unwrap() as usize,
             None => 8usize,
@@ -169,18 +154,11 @@ impl Source for ThrSource {
         let state = ThrSourceState { data };
         let output = outputs.remove(THR_PORT).unwrap();
 
-        Ok(Some(Arc::new(async move || {
+        Ok(Some(Arc::new(move || async move {
             let data = state.data.clone();
-            let data = Data::from_arc::<ThrData>(data);
+            let data = Data::from(data);
             output.send_async(data, None).await
         })))
-    }
-}
-
-#[async_trait]
-impl Node for ThrSource {
-    async fn finalize(&self) -> ZFResult<()> {
-        Ok(())
     }
 }
 
@@ -189,7 +167,7 @@ impl Node for ThrSource {
 #[derive(Debug)]
 pub struct ScalPingSource;
 
-#[derive(Debug, ZFState, Clone)]
+#[derive(Debug, Clone)]
 struct ScalPingSourceState {
     interval: f64,
     subs: Arc<Vec<Subscriber<'static>>>,
@@ -213,7 +191,7 @@ impl Source for ScalPingSource {
         _ctx: &mut Context,
         configuration: &Option<Configuration>,
         mut outputs: Outputs,
-    ) -> ZFResult<Option<Arc<dyn AsyncIteration>>>  {
+    ) -> ZFResult<Option<Arc<dyn AsyncIteration>>> {
         let interval = match configuration {
             Some(conf) => conf["interval"].as_f64().unwrap(),
             None => 1.0f64,
@@ -265,7 +243,7 @@ impl Source for ScalPingSource {
 
         let output = outputs.remove(LAT_PORT).unwrap();
 
-        Ok(Some(Arc::new(async move || {
+        Ok(Some(Arc::new(move || async move {
             async_std::task::sleep(Duration::from_secs_f64(state.interval)).await;
             async_std::task::sleep(Duration::from_secs_f64(state.interval)).await;
             if !state.first {
@@ -279,12 +257,5 @@ impl Source for ScalPingSource {
             let data = Data::from(Latency { ts: get_epoch_us() });
             output.send_async(data, None).await
         })))
-    }
-}
-
-#[async_trait]
-impl Node for ScalPingSource {
-    async fn finalize(&self) -> ZFResult<()> {
-        Ok(())
     }
 }

@@ -14,7 +14,7 @@
 
 use clap::Parser;
 use std::sync::atomic::{AtomicU64, Ordering};
-use zenoh_flow::async_std::sync::Arc;
+use std::sync::Arc;
 use zenoh_flow::async_std::task;
 
 static DEFAULT_INT: &str = "1";

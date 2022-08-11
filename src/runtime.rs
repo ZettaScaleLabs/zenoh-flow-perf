@@ -14,12 +14,12 @@
 
 use std::convert::TryFrom;
 use std::fs::read_to_string;
+use std::fs::File;
+use std::io::Write;
+use std::path::Path;
 use zenoh_flow::async_std::sync::Arc;
 use zenoh_flow::runtime::dataflow::loader::{Loader, LoaderConfig};
 use zenoh_flow::runtime::RuntimeContext;
-use std::path::Path;
-use std::fs::File;
-use std::io::Write;
 
 pub enum Descriptor {
     Composed(String),

@@ -18,7 +18,7 @@ use rand::Rng;
 use std::time::Duration;
 use zenoh::net::protocol::io::SplitBuffer;
 use zenoh::publication::CongestionControl;
-use zenoh_flow::{Data, Message};
+use zenoh_flow::prelude::*;
 use zenoh_flow_perf::{get_epoch_us, Latency};
 
 static DEFAULT_PIPELINE: &str = "1";
@@ -47,7 +47,7 @@ async fn publisher(interval: f64, session: zenoh::Session, drop: bool) {
         let hlc = async_std::sync::Arc::new(uhlc::HLC::default());
 
         let msg = Latency { ts: get_epoch_us() };
-        let data = Data::from::<Latency>(msg);
+        let data = Data::from(msg);
         let msg = Message::from_serdedata(data, hlc.new_timestamp());
 
         let value = msg.serialize_bincode().unwrap();

@@ -17,19 +17,18 @@ use async_trait::async_trait;
 use futures::future::{AbortHandle, Abortable};
 use rand::Rng;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 use zenoh::prelude::*;
 use zenoh::publication::CongestionControl;
-use zenoh_flow::async_std::sync::Arc;
-use zenoh_flow::zenoh_flow_derive::ZFState;
-use zenoh_flow::{AsyncIteration, Configuration, Inputs, Message, Node, Sink, ZFResult, Context};
+use zenoh_flow::prelude::*;
 
 use super::{LAT_PORT, THR_PORT};
 
 // Latency SINK
 pub struct LatSink;
 
-#[derive(ZFState, Debug, Clone)]
+#[derive(Debug, Clone)]
 struct LatSinkState {
     pipeline: u64,
     _interval: f64,
@@ -43,7 +42,7 @@ impl Sink for LatSink {
         _ctx: &mut Context,
         configuration: &Option<Configuration>,
         mut inputs: Inputs,
-    ) -> ZFResult<Option<Arc<dyn AsyncIteration>>>  {
+    ) -> ZFResult<Option<Arc<dyn AsyncIteration>>> {
         let interval = match configuration {
             Some(conf) => conf["interval"].as_f64().unwrap(),
             None => 1.0f64,
@@ -67,7 +66,7 @@ impl Sink for LatSink {
 
         let input = inputs.remove(LAT_PORT).unwrap();
 
-        Ok(Some(Arc::new(async move || {
+        Ok(Some(Arc::new(move || async move {
             if let Ok(Message::Data(mut msg)) = input.recv_async().await {
                 let data = msg.get_inner_data().try_get::<Latency>()?;
                 let now = get_epoch_us();
@@ -82,18 +81,11 @@ impl Sink for LatSink {
     }
 }
 
-#[async_trait]
-impl Node for LatSink {
-    async fn finalize(&self) -> ZFResult<()> {
-        Ok(())
-    }
-}
-
 // Pong SINK
 
 pub struct PongSink;
 
-#[derive(ZFState, Debug, Clone)]
+#[derive(Debug, Clone)]
 struct PongSinkState {
     pipeline: u64,
     _interval: f64,
@@ -111,7 +103,7 @@ impl Sink for PongSink {
         _ctx: &mut Context,
         configuration: &Option<Configuration>,
         mut inputs: Inputs,
-    ) -> ZFResult<Option<Arc<dyn AsyncIteration>>>  {
+    ) -> ZFResult<Option<Arc<dyn AsyncIteration>>> {
         let interval = match configuration {
             Some(conf) => conf["interval"].as_f64().unwrap(),
             None => 1.0f64,
@@ -160,7 +152,7 @@ impl Sink for PongSink {
 
         let input = inputs.remove(LAT_PORT).unwrap();
 
-        Ok(Some(Arc::new(async move || {
+        Ok(Some(Arc::new(move || async move {
             if let Ok(Message::Data(mut msg)) = input.recv_async().await {
                 let data = msg.get_inner_data().try_get::<Latency>()?;
                 let now = get_epoch_us();
@@ -181,18 +173,12 @@ impl Sink for PongSink {
         })))
     }
 }
-#[async_trait]
-impl Node for PongSink {
-    async fn finalize(&self) -> ZFResult<()> {
-        Ok(())
-    }
-}
 
 // THR SINK
 
 pub struct ThrSink;
 
-#[derive(ZFState, Debug, Clone)]
+#[derive(Debug, Clone)]
 struct SinkState {
     pub _payload_size: usize,
     pub accumulator: Arc<AtomicUsize>,
@@ -206,7 +192,7 @@ impl Sink for ThrSink {
         _ctx: &mut Context,
         configuration: &Option<Configuration>,
         mut inputs: Inputs,
-    ) -> ZFResult<Option<Arc<dyn AsyncIteration>>>  {
+    ) -> ZFResult<Option<Arc<dyn AsyncIteration>>> {
         let payload_size = match configuration {
             Some(conf) => conf["payload_size"].as_u64().unwrap() as usize,
             None => 8usize,
@@ -261,7 +247,7 @@ impl Sink for ThrSink {
 
         let input = inputs.remove(THR_PORT).unwrap();
 
-        Ok(Some(Arc::new(async move || {
+        Ok(Some(Arc::new(move || async move {
             if let Ok(Message::Data(_)) = input.recv_async().await {
                 state.accumulator.fetch_add(1, Ordering::Relaxed);
             }
@@ -270,18 +256,11 @@ impl Sink for ThrSink {
     }
 }
 
-#[async_trait]
-impl Node for ThrSink {
-    async fn finalize(&self) -> ZFResult<()> {
-        Ok(())
-    }
-}
-
 // PONG SINK SCALABILITY
 
 pub struct ScalPongSink;
 
-#[derive(ZFState, Debug, Clone)]
+#[derive(Debug, Clone)]
 struct ScalPongSinkState {
     nodes: u64,
     _interval: f64,
@@ -300,7 +279,7 @@ impl Sink for ScalPongSink {
         _ctx: &mut Context,
         configuration: &Option<Configuration>,
         mut inputs: Inputs,
-    ) -> ZFResult<Option<Arc<dyn AsyncIteration>>>  {
+    ) -> ZFResult<Option<Arc<dyn AsyncIteration>>> {
         let mut rng = rand::thread_rng();
         let interval = match configuration {
             Some(conf) => conf["interval"].as_f64().unwrap(),
@@ -369,7 +348,7 @@ impl Sink for ScalPongSink {
 
         let input = inputs.remove(LAT_PORT).unwrap();
 
-        Ok(Some(Arc::new(async move || {
+        Ok(Some(Arc::new(move || async move {
             if let Ok(Message::Data(mut msg)) = input.recv_async().await {
                 let data = msg.get_inner_data().try_get::<Latency>()?;
                 let now = get_epoch_us();
@@ -391,12 +370,5 @@ impl Sink for ScalPongSink {
             }
             Ok(())
         })))
-    }
-}
-
-#[async_trait]
-impl Node for ScalPongSink {
-    async fn finalize(&self) -> ZFResult<()> {
-        Ok(())
     }
 }

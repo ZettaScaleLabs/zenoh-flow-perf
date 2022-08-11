@@ -12,7 +12,7 @@
 //   ZettaScale zenoh team, <zenoh@zettascale.tech>
 //
 
-use async_std::sync::Arc;
+use std::sync::Arc;
 use clap::Parser;
 use serde_json::Value;
 use std::collections::HashMap;

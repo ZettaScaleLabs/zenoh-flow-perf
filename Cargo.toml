@@ -16,6 +16,7 @@ readme = "README.md"
 
 [dependencies]
 zenoh-flow = { git = "https://github.com/ZettaScaleLabs/zenoh-flow.git", branch = "dev/v0.4.0" }
+#zenoh-flow = { path = "../zf-zetta/zenoh-flow" }
 env_logger = "0.9"
 serde = { version = "1.0.55", features = ["derive"] }
 async-std = { version = "=1.11.0", features = ["attributes"] }

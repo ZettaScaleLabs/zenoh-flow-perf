@@ -12,8 +12,8 @@
 //   ZettaScale zenoh team, <zenoh@zettascale.tech>
 //
 
-use zenoh_flow::async_std::sync::Arc;
-use zenoh_flow::{export_sink, types::ZFResult, Sink};
+use std::sync::Arc;
+use zenoh_flow::prelude::*;
 use zenoh_flow_perf::nodes::LatSink;
 
 export_sink!(register);

@@ -12,9 +12,8 @@
 //   ZettaScale zenoh team, <zenoh@zettascale.tech>
 //
 
-use zenoh_flow::async_std::sync::Arc;
-use zenoh_flow::Source;
-use zenoh_flow::{export_source, types::ZFResult};
+use std::sync::Arc;
+use zenoh_flow::prelude::*;
 use zenoh_flow_perf::nodes::PingSource;
 
 export_source!(register);

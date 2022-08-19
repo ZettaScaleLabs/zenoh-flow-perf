@@ -31,7 +31,7 @@ impl Operator for NoOp {
         _configuration: &Option<Configuration>,
         mut inputs: Inputs,
         mut outputs: Outputs,
-    ) -> ZFResult<Option<Arc<dyn AsyncIteration>>> {
+    ) -> Result<Option<Arc<dyn AsyncIteration>>> {
         let input = inputs.remove(LAT_PORT).unwrap();
         let output = outputs.remove(LAT_PORT).unwrap();
 
@@ -68,7 +68,7 @@ impl Operator for NoOpPrint {
         configuration: &Option<Configuration>,
         mut inputs: Inputs,
         mut _outputs: Outputs,
-    ) -> ZFResult<Option<Arc<dyn AsyncIteration>>> {
+    ) -> Result<Option<Arc<dyn AsyncIteration>>> {
         let interval = match configuration {
             Some(conf) => conf["interval"].as_f64().unwrap(),
             None => 1.0f64,
@@ -131,7 +131,7 @@ impl Operator for ThrNoOp {
         _configuration: &Option<Configuration>,
         mut inputs: Inputs,
         mut outputs: Outputs,
-    ) -> ZFResult<Option<Arc<dyn AsyncIteration>>> {
+    ) -> Result<Option<Arc<dyn AsyncIteration>>> {
         let input = inputs.remove(THR_PORT).unwrap();
         let output = outputs.remove(THR_PORT).unwrap();
 
@@ -164,7 +164,7 @@ impl Operator for IRNoOp {
         configuration: &Option<Configuration>,
         mut inputs: Inputs,
         mut outputs: Outputs,
-    ) -> ZFResult<Option<Arc<dyn AsyncIteration>>> {
+    ) -> Result<Option<Arc<dyn AsyncIteration>>> {
         let op_inputs = match configuration {
             Some(conf) => conf["inputs"].as_u64().unwrap(),
             None => 1,

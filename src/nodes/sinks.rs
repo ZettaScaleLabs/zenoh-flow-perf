@@ -42,7 +42,7 @@ impl Sink for LatSink {
         _ctx: &mut Context,
         configuration: &Option<Configuration>,
         mut inputs: Inputs,
-    ) -> ZFResult<Option<Arc<dyn AsyncIteration>>> {
+    ) -> Result<Option<Arc<dyn AsyncIteration>>> {
         let interval = match configuration {
             Some(conf) => conf["interval"].as_f64().unwrap(),
             None => 1.0f64,
@@ -103,7 +103,7 @@ impl Sink for PongSink {
         _ctx: &mut Context,
         configuration: &Option<Configuration>,
         mut inputs: Inputs,
-    ) -> ZFResult<Option<Arc<dyn AsyncIteration>>> {
+    ) -> Result<Option<Arc<dyn AsyncIteration>>> {
         let interval = match configuration {
             Some(conf) => conf["interval"].as_f64().unwrap(),
             None => 1.0f64,
@@ -192,7 +192,7 @@ impl Sink for ThrSink {
         _ctx: &mut Context,
         configuration: &Option<Configuration>,
         mut inputs: Inputs,
-    ) -> ZFResult<Option<Arc<dyn AsyncIteration>>> {
+    ) -> Result<Option<Arc<dyn AsyncIteration>>> {
         let payload_size = match configuration {
             Some(conf) => conf["payload_size"].as_u64().unwrap() as usize,
             None => 8usize,
@@ -279,7 +279,7 @@ impl Sink for ScalPongSink {
         _ctx: &mut Context,
         configuration: &Option<Configuration>,
         mut inputs: Inputs,
-    ) -> ZFResult<Option<Arc<dyn AsyncIteration>>> {
+    ) -> Result<Option<Arc<dyn AsyncIteration>>> {
         let mut rng = rand::thread_rng();
         let interval = match configuration {
             Some(conf) => conf["interval"].as_f64().unwrap(),

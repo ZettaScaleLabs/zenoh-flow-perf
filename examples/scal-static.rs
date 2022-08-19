@@ -12,11 +12,11 @@
 //   ZettaScale zenoh team, <zenoh@zettascale.tech>
 //
 
-use std::sync::Arc;
 use clap::Parser;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::str::FromStr;
+use std::sync::Arc;
 use zenoh_flow::model::link::PortDescriptor;
 use zenoh_flow::model::{InputDescriptor, OutputDescriptor};
 use zenoh_flow::runtime::dataflow::instance::DataflowInstance;
@@ -98,10 +98,10 @@ async fn main() {
         .try_add_static_source(
             "source".into(),
             config.clone(),
-            PortDescriptor {
+            vec![PortDescriptor {
                 port_id: String::from(LAT_PORT).into(),
                 port_type: String::from("lat").into(),
-            },
+            }],
             source,
         )
         .unwrap();
@@ -120,10 +120,10 @@ async fn main() {
                 .try_add_static_sink(
                     "sink".into(),
                     sink_config,
-                    PortDescriptor {
+                    vec![PortDescriptor {
                         port_id: String::from(LAT_PORT).into(),
                         port_type: String::from("lat").into(),
-                    },
+                    }],
                     sink,
                 )
                 .unwrap();
@@ -267,10 +267,10 @@ async fn main() {
                     .try_add_static_sink(
                         format!("sink-{i}").into(),
                         sink_config.clone(),
-                        PortDescriptor {
+                        vec![PortDescriptor {
                             port_id: String::from(LAT_PORT).into(),
                             port_type: String::from("lat").into(),
-                        },
+                        }],
                         sink,
                     )
                     .unwrap();

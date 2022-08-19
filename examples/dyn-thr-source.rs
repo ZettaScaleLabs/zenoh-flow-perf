@@ -18,6 +18,6 @@ use zenoh_flow_perf::nodes::ThrSource;
 
 export_source!(register);
 
-fn register() -> ZFResult<Arc<dyn Source>> {
+fn register() -> Result<Arc<dyn Source>> {
     Ok(Arc::new(ThrSource) as Arc<dyn Source>)
 }

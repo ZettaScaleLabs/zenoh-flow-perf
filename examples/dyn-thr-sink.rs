@@ -12,12 +12,12 @@
 //   ZettaScale zenoh team, <zenoh@zettascale.tech>
 //
 
-use zenoh_flow::async_std::sync::Arc;
+use std::sync::Arc;
 use zenoh_flow::prelude::*;
 use zenoh_flow_perf::nodes::ThrSink;
 
 export_sink!(register);
 
-fn register() -> ZFResult<Arc<dyn Sink>> {
+fn register() -> Result<Arc<dyn Sink>> {
     Ok(Arc::new(ThrSink) as Arc<dyn Sink>)
 }

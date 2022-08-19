@@ -64,10 +64,10 @@ async fn main() {
         .try_add_static_source(
             "thr-source".into(),
             config.clone(),
-            PortDescriptor {
+            vec![PortDescriptor {
                 port_id: String::from(THR_PORT).into(),
                 port_type: String::from("thr").into(),
-            },
+            }],
             source,
         )
         .unwrap();
@@ -76,10 +76,10 @@ async fn main() {
         .try_add_static_sink(
             "thr-sink".into(),
             config.clone(),
-            PortDescriptor {
+            vec![PortDescriptor {
                 port_id: String::from(THR_PORT).into(),
                 port_type: String::from("thr").into(),
-            },
+            }],
             sink,
         )
         .unwrap();
@@ -139,5 +139,5 @@ async fn main() {
         instance.start_node(id).await.unwrap()
     }
 
-    zenoh_flow::async_std::task::sleep(std::time::Duration::from_secs(args.duration)).await;
+    async_std::task::sleep(std::time::Duration::from_secs(args.duration)).await;
 }

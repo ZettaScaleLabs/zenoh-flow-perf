@@ -75,10 +75,10 @@ async fn main() {
         .try_add_static_source(
             "lat-source".into(),
             config.clone(),
-            PortDescriptor {
+            vec![PortDescriptor {
                 port_id: String::from(LAT_PORT).into(),
                 port_type: String::from("lat").into(),
-            },
+            }],
             source,
         )
         .unwrap();
@@ -87,10 +87,10 @@ async fn main() {
         .try_add_static_sink(
             "lat-sink".into(),
             config.clone(),
-            PortDescriptor {
+            vec![PortDescriptor {
                 port_id: String::from(LAT_PORT).into(),
                 port_type: String::from("lat").into(),
-            },
+            }],
             sink,
         )
         .unwrap();

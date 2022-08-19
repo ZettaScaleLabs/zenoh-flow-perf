@@ -12,10 +12,10 @@
 //   ZettaScale zenoh team, <zenoh@zettascale.tech>
 //
 
+use async_std::task;
 use clap::Parser;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
-use zenoh_flow::async_std::task;
 
 static DEFAULT_INT: &str = "1";
 static DEFAULT_SIZE: &str = "8";

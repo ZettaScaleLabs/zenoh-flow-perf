@@ -18,6 +18,6 @@ use zenoh_flow_perf::nodes::IRNoOp;
 
 export_operator!(register);
 
-fn register() -> ZFResult<Arc<dyn Operator>> {
+fn register() -> Result<Arc<dyn Operator>> {
     Ok(Arc::new(IRNoOp) as Arc<dyn Operator>)
 }

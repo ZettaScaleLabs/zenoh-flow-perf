@@ -87,20 +87,20 @@ async fn main() {
     let (source_descriptor, sink_descriptor) = {
         let src = SourceDescriptor {
             id: "source".into(),
-            output: PortDescriptor {
+            outputs: vec![PortDescriptor {
                 port_id: PORT.into(),
                 port_type: "data".into(),
-            },
+            }],
             uri: Some(String::from(SRC_URI)),
             configuration: config.clone(),
             tags: vec![],
         };
         let snk = SinkDescriptor {
             id: "sink".into(),
-            input: PortDescriptor {
+            inputs: vec![PortDescriptor {
                 port_id: PORT.into(),
                 port_type: "data".into(),
-            },
+            }],
             uri: Some(String::from(SNK_URI)),
             configuration: config,
             tags: vec![],

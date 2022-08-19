@@ -18,6 +18,6 @@ use zenoh_flow_perf::nodes::LatSink;
 
 export_sink!(register);
 
-fn register() -> ZFResult<Arc<dyn Sink>> {
+fn register() -> Result<Arc<dyn Sink>> {
     Ok(Arc::new(LatSink) as Arc<dyn Sink>)
 }

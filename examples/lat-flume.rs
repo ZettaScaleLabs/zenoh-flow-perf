@@ -12,9 +12,9 @@
 //   ZettaScale zenoh team, <zenoh@zettascale.tech>
 //
 
+use async_std::task;
 use clap::Parser;
 use std::time::Duration;
-use zenoh_flow::async_std::task;
 use zenoh_flow_perf::{get_epoch_us, Latency};
 
 static DEFAULT_PIPELINE: &str = "1";

@@ -125,10 +125,10 @@ async fn main() {
 
     let source_descriptor = SourceDescriptor {
         id: "source".into(),
-        output: PortDescriptor {
+        outputs: vec![PortDescriptor {
             port_id: LAT_PORT.into(),
             port_type: "latency".into(),
-        },
+        }],
         uri: Some(String::from(PING_SRC_URI)),
         configuration: config.clone(),
         tags: vec![],
@@ -146,10 +146,10 @@ async fn main() {
             // creating sink
             let sink_descriptor = SinkDescriptor {
                 id: "sink".into(),
-                input: PortDescriptor {
+                inputs: vec![PortDescriptor {
                     port_id: LAT_PORT.into(),
                     port_type: "latency".into(),
-                },
+                }],
                 uri: Some(String::from(PONG_SNK_URI)),
                 configuration: sink_config,
                 tags: vec![],
@@ -279,10 +279,10 @@ async fn main() {
 
                 let sink_descriptor = SinkDescriptor {
                     id: format!("sink-{i}").into(),
-                    input: PortDescriptor {
+                    inputs: vec![PortDescriptor {
                         port_id: LAT_PORT.into(),
                         port_type: "latency".into(),
-                    },
+                    }],
                     uri: Some(String::from(PONG_SNK_URI)),
                     configuration: Some(sink_config),
                     tags: vec![],

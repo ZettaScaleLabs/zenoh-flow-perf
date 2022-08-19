@@ -13,9 +13,9 @@
 //
 
 use clap::Parser;
+use std::sync::Arc;
 use std::time::Duration;
 use uhlc::HLC;
-use std::sync::Arc;
 use zenoh_flow::prelude::*;
 use zenoh_flow_perf::{get_epoch_us, Latency};
 

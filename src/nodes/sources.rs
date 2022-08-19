@@ -39,7 +39,7 @@ impl Source for LatSource {
         _ctx: &mut Context,
         configuration: &Option<Configuration>,
         mut outputs: Outputs,
-    ) -> ZFResult<Option<Arc<dyn AsyncIteration>>> {
+    ) -> Result<Option<Arc<dyn AsyncIteration>>> {
         let interval = match configuration {
             Some(conf) => conf["interval"].as_f64().unwrap(),
             None => 1.0f64,
@@ -85,7 +85,7 @@ impl Source for PingSource {
         _ctx: &mut Context,
         configuration: &Option<Configuration>,
         mut outputs: Outputs,
-    ) -> ZFResult<Option<Arc<dyn AsyncIteration>>> {
+    ) -> Result<Option<Arc<dyn AsyncIteration>>> {
         let interval = match configuration {
             Some(conf) => conf["interval"].as_f64().unwrap(),
             None => 1.0f64,
@@ -139,7 +139,7 @@ impl Source for ThrSource {
         _ctx: &mut Context,
         configuration: &Option<Configuration>,
         mut outputs: Outputs,
-    ) -> ZFResult<Option<Arc<dyn AsyncIteration>>> {
+    ) -> Result<Option<Arc<dyn AsyncIteration>>> {
         let payload_size = match configuration {
             Some(conf) => conf["payload_size"].as_u64().unwrap() as usize,
             None => 8usize,
@@ -191,7 +191,7 @@ impl Source for ScalPingSource {
         _ctx: &mut Context,
         configuration: &Option<Configuration>,
         mut outputs: Outputs,
-    ) -> ZFResult<Option<Arc<dyn AsyncIteration>>> {
+    ) -> Result<Option<Arc<dyn AsyncIteration>>> {
         let interval = match configuration {
             Some(conf) => conf["interval"].as_f64().unwrap(),
             None => 1.0f64,

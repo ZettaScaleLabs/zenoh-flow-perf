@@ -94,6 +94,7 @@ async fn main() {
             uri: Some(String::from(SRC_URI)),
             configuration: config.clone(),
             tags: vec![],
+            flags: None,
         };
         let snk = SinkDescriptor {
             id: "sink".into(),
@@ -104,6 +105,7 @@ async fn main() {
             uri: Some(String::from(SNK_URI)),
             configuration: config,
             tags: vec![],
+            flags: None,
         };
         (src, snk)
     };
@@ -128,6 +130,7 @@ async fn main() {
             uri: Some(String::from(NOOP_URI)),
             configuration: None,
             tags: vec![],
+            flags: None,
         };
         dfd.operators.push(op_descriptor);
     }

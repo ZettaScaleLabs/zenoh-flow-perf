@@ -14,6 +14,7 @@
 
 use crate::{get_epoch_us, Latency, ThrData};
 
+use async_std::sync::Mutex;
 use async_trait::async_trait;
 use std::sync::Arc;
 use std::time::Duration;
@@ -39,19 +40,24 @@ impl Source for LatSource {
         _ctx: &mut Context,
         configuration: &Option<Configuration>,
         mut outputs: Outputs,
-    ) -> Result<Option<Arc<dyn AsyncIteration>>> {
+    ) -> Result<Option<Box<dyn AsyncIteration>>> {
         let interval = match configuration {
             Some(conf) => conf["interval"].as_f64().unwrap(),
             None => 1.0f64,
         };
 
-        let state = LatSourceState { interval };
-        let output = outputs.remove(LAT_PORT).unwrap();
+        let state = Arc::new(LatSourceState { interval });
+        let output = outputs.take_into_arc(LAT_PORT).unwrap();
 
-        Ok(Some(Arc::new(move || async move {
-            async_std::task::sleep(Duration::from_secs_f64(state.interval)).await;
-            let data = Data::from(Latency { ts: get_epoch_us() });
-            output.send_async(data, None).await
+        Ok(Some(Box::new(move || {
+            let c_state = state.clone();
+            let c_output = output.clone();
+
+            async move {
+                async_std::task::sleep(Duration::from_secs_f64(c_state.interval)).await;
+                let data = Data::from(Latency { ts: get_epoch_us() });
+                c_output.send_async(data, None).await
+            }
         })))
     }
 }
@@ -85,7 +91,7 @@ impl Source for PingSource {
         _ctx: &mut Context,
         configuration: &Option<Configuration>,
         mut outputs: Outputs,
-    ) -> Result<Option<Arc<dyn AsyncIteration>>> {
+    ) -> Result<Option<Box<dyn AsyncIteration>>> {
         let interval = match configuration {
             Some(conf) => conf["interval"].as_f64().unwrap(),
             None => 1.0f64,
@@ -104,20 +110,26 @@ impl Source for PingSource {
 
         let sub = session.subscribe(&key_expr_pong).wait().unwrap();
 
-        let mut state = PingSourceState::new(interval, sub);
+        let state = Arc::new(Mutex::new(PingSourceState::new(interval, sub)));
 
-        let output = outputs.remove(LAT_PORT).unwrap();
+        let output = outputs.take_into_arc(LAT_PORT).unwrap();
 
-        Ok(Some(Arc::new(move || async move {
-            async_std::task::sleep(Duration::from_secs_f64(state.interval)).await;
-            if !state.first {
-                let _ = state.sub.recv();
-            } else {
-                state.first = false;
+        Ok(Some(Box::new(move || {
+            let c_output = output.clone();
+            let c_state = state.clone();
+
+            async move {
+                let mut c_state = c_state.lock().await;
+                async_std::task::sleep(Duration::from_secs_f64(c_state.interval)).await;
+                if !c_state.first {
+                    let _ = c_state.sub.recv();
+                } else {
+                    c_state.first = false;
+                }
+
+                let data = Data::from(Latency { ts: get_epoch_us() });
+                c_output.send_async(data, None).await
             }
-
-            let data = Data::from(Latency { ts: get_epoch_us() });
-            output.send_async(data, None).await
         })))
     }
 }
@@ -139,7 +151,7 @@ impl Source for ThrSource {
         _ctx: &mut Context,
         configuration: &Option<Configuration>,
         mut outputs: Outputs,
-    ) -> Result<Option<Arc<dyn AsyncIteration>>> {
+    ) -> Result<Option<Box<dyn AsyncIteration>>> {
         let payload_size = match configuration {
             Some(conf) => conf["payload_size"].as_u64().unwrap() as usize,
             None => 8usize,
@@ -151,13 +163,17 @@ impl Source for ThrSource {
                 .collect::<Vec<u8>>(),
         });
 
-        let state = ThrSourceState { data };
-        let output = outputs.remove(THR_PORT).unwrap();
+        let state = Arc::new(ThrSourceState { data });
+        let output = outputs.take_into_arc(THR_PORT).unwrap();
 
-        Ok(Some(Arc::new(move || async move {
-            let data = state.data.clone();
-            let data = Data::from(data);
-            output.send_async(data, None).await
+        Ok(Some(Box::new(move || {
+            let c_output = output.clone();
+            let c_state = state.clone();
+            async move {
+                let data = c_state.data.clone();
+                let data = Data::from(data);
+                c_output.send_async(data, None).await
+            }
         })))
     }
 }
@@ -191,7 +207,7 @@ impl Source for ScalPingSource {
         _ctx: &mut Context,
         configuration: &Option<Configuration>,
         mut outputs: Outputs,
-    ) -> Result<Option<Arc<dyn AsyncIteration>>> {
+    ) -> Result<Option<Box<dyn AsyncIteration>>> {
         let interval = match configuration {
             Some(conf) => conf["interval"].as_f64().unwrap(),
             None => 1.0f64,
@@ -239,23 +255,28 @@ impl Source for ScalPingSource {
             subs.push(sub);
         }
 
-        let mut state = ScalPingSourceState::new(interval, subs);
+        let state = Arc::new(Mutex::new(ScalPingSourceState::new(interval, subs)));
 
-        let output = outputs.remove(LAT_PORT).unwrap();
+        let output = outputs.take_into_arc(LAT_PORT).unwrap();
 
-        Ok(Some(Arc::new(move || async move {
-            async_std::task::sleep(Duration::from_secs_f64(state.interval)).await;
-            async_std::task::sleep(Duration::from_secs_f64(state.interval)).await;
-            if !state.first {
-                for sub in &*state.subs {
-                    let _ = sub.recv();
+        Ok(Some(Box::new(move || {
+            let c_state = state.clone();
+            let c_output = output.clone();
+
+            async move {
+                let mut c_state = c_state.lock().await;
+                async_std::task::sleep(Duration::from_secs_f64(c_state.interval)).await;
+                if !c_state.first {
+                    for sub in &*c_state.subs {
+                        let _ = sub.recv();
+                    }
+                } else {
+                    c_state.first = false;
                 }
-            } else {
-                state.first = false;
-            }
 
-            let data = Data::from(Latency { ts: get_epoch_us() });
-            output.send_async(data, None).await
+                let data = Data::from(Latency { ts: get_epoch_us() });
+                c_output.send_async(data, None).await
+            }
         })))
     }
 }

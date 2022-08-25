@@ -132,7 +132,7 @@ async fn main() {
         uri: Some(String::from(PING_SRC_URI)),
         configuration: config.clone(),
         tags: vec![],
-        flags: None
+        flags: None,
     };
 
     // Adding source and sinks to descriptor
@@ -154,7 +154,7 @@ async fn main() {
                 uri: Some(String::from(PONG_SNK_URI)),
                 configuration: sink_config,
                 tags: vec![],
-                flags: None
+                flags: None,
             };
             dfd.sinks.push(sink_descriptor);
             mapping.insert("sink".into(), "snk".into());
@@ -174,7 +174,7 @@ async fn main() {
                     uri: Some(String::from(NOOP_URI)),
                     configuration: None,
                     tags: vec![],
-                    flags: None
+                    flags: None,
                 };
                 dfd.operators.push(op_descriptor);
             }
@@ -199,7 +199,7 @@ async fn main() {
                 uri: Some(String::from(LASTOP_URI)),
                 configuration: None,
                 tags: vec![],
-                flags: None
+                flags: None,
             };
 
             dfd.operators.push(op_descriptor);
@@ -270,7 +270,7 @@ async fn main() {
                     uri: Some(String::from(NOOP_URI)),
                     configuration: None,
                     tags: vec![],
-                    flags: None
+                    flags: None,
                 };
                 dfd.operators.push(op_descriptor);
             }
@@ -291,7 +291,7 @@ async fn main() {
                     uri: Some(String::from(PONG_SNK_URI)),
                     configuration: Some(sink_config),
                     tags: vec![],
-                    flags: None
+                    flags: None,
                 };
 
                 dfd.sinks.push(sink_descriptor);

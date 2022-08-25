@@ -42,7 +42,7 @@ impl Sink for LatSink {
         _ctx: &mut Context,
         configuration: &Option<Configuration>,
         mut inputs: Inputs,
-    ) -> Result<Option<Arc<dyn AsyncIteration>>> {
+    ) -> Result<Option<Box<dyn AsyncIteration>>> {
         let interval = match configuration {
             Some(conf) => conf["interval"].as_f64().unwrap(),
             None => 1.0f64,
@@ -64,19 +64,24 @@ impl Sink for LatSink {
             msgs,
         };
 
-        let input = inputs.remove(LAT_PORT).unwrap();
+        let input = inputs.take_into_arc(LAT_PORT).unwrap();
 
-        Ok(Some(Arc::new(move || async move {
-            if let Ok(Message::Data(mut msg)) = input.recv_async().await {
-                let data = msg.get_inner_data().try_get::<Latency>()?;
-                let now = get_epoch_us();
+        Ok(Some(Box::new(move || {
+            let c_input = input.clone();
+            let c_state = state.clone();
 
-                let elapsed = now - data.ts;
-                let msgs = state.msgs;
-                let pipeline = state.pipeline;
-                println!("zenoh-flow,single,latency,{pipeline},8,{msgs},{elapsed},us");
+            async move {
+                if let Ok(Message::Data(mut msg)) = c_input.recv_async().await {
+                    let data = msg.get_inner_data().try_get::<Latency>()?;
+                    let now = get_epoch_us();
+
+                    let elapsed = now - data.ts;
+                    let msgs = c_state.msgs;
+                    let pipeline = c_state.pipeline;
+                    println!("zenoh-flow,single,latency,{pipeline},8,{msgs},{elapsed},us");
+                }
+                Ok(())
             }
-            Ok(())
         })))
     }
 }
@@ -103,7 +108,7 @@ impl Sink for PongSink {
         _ctx: &mut Context,
         configuration: &Option<Configuration>,
         mut inputs: Inputs,
-    ) -> Result<Option<Arc<dyn AsyncIteration>>> {
+    ) -> Result<Option<Box<dyn AsyncIteration>>> {
         let interval = match configuration {
             Some(conf) => conf["interval"].as_f64().unwrap(),
             None => 1.0f64,
@@ -150,26 +155,31 @@ impl Sink for PongSink {
             layer,
         };
 
-        let input = inputs.remove(LAT_PORT).unwrap();
+        let input = inputs.take_into_arc(LAT_PORT).unwrap();
 
-        Ok(Some(Arc::new(move || async move {
-            if let Ok(Message::Data(mut msg)) = input.recv_async().await {
-                let data = msg.get_inner_data().try_get::<Latency>()?;
-                let now = get_epoch_us();
+        Ok(Some(Box::new(move || {
+            let c_input = input.clone();
+            let c_state = state.clone();
 
-                let elapsed = now - data.ts;
-                let msgs = state.msgs;
-                let pipeline = state.pipeline;
-                let layer = state.layer;
-                println!("zenoh-flow,{layer},latency,{pipeline},8,{msgs},{elapsed},us");
+            async move {
+                if let Ok(Message::Data(mut msg)) = c_input.recv_async().await {
+                    let data = msg.get_inner_data().try_get::<Latency>()?;
+                    let now = get_epoch_us();
 
-                state
-                    .session
-                    .put(&state.expr, state.data.clone())
-                    .congestion_control(CongestionControl::Block)
-                    .await?;
+                    let elapsed = now - data.ts;
+                    let msgs = c_state.msgs;
+                    let pipeline = c_state.pipeline;
+                    let layer = c_state.layer;
+                    println!("zenoh-flow,{layer},latency,{pipeline},8,{msgs},{elapsed},us");
+
+                    c_state
+                        .session
+                        .put(&c_state.expr, c_state.data.clone())
+                        .congestion_control(CongestionControl::Block)
+                        .await?;
+                }
+                Ok(())
             }
-            Ok(())
         })))
     }
 }
@@ -192,7 +202,7 @@ impl Sink for ThrSink {
         _ctx: &mut Context,
         configuration: &Option<Configuration>,
         mut inputs: Inputs,
-    ) -> Result<Option<Arc<dyn AsyncIteration>>> {
+    ) -> Result<Option<Box<dyn AsyncIteration>>> {
         let payload_size = match configuration {
             Some(conf) => conf["payload_size"].as_u64().unwrap() as usize,
             None => 8usize,
@@ -239,19 +249,23 @@ impl Sink for ThrSink {
         let (abort_handle, abort_registration) = AbortHandle::new_pair();
         let _print_task = async_std::task::spawn(Abortable::new(print_loop, abort_registration));
 
-        let state = SinkState {
+        let state = Arc::new(SinkState {
             _payload_size: payload_size,
             accumulator,
             _abort_handle: abort_handle,
-        };
+        });
 
-        let input = inputs.remove(THR_PORT).unwrap();
+        let input = inputs.take_into_arc(THR_PORT).unwrap();
 
-        Ok(Some(Arc::new(move || async move {
-            if let Ok(Message::Data(_)) = input.recv_async().await {
-                state.accumulator.fetch_add(1, Ordering::Relaxed);
+        Ok(Some(Box::new(move || {
+            let c_input = input.clone();
+            let c_state = state.clone();
+            async move {
+                if let Ok(Message::Data(_)) = c_input.recv_async().await {
+                    c_state.accumulator.fetch_add(1, Ordering::Relaxed);
+                }
+                Ok(())
             }
-            Ok(())
         })))
     }
 }
@@ -279,7 +293,7 @@ impl Sink for ScalPongSink {
         _ctx: &mut Context,
         configuration: &Option<Configuration>,
         mut inputs: Inputs,
-    ) -> Result<Option<Arc<dyn AsyncIteration>>> {
+    ) -> Result<Option<Box<dyn AsyncIteration>>> {
         let mut rng = rand::thread_rng();
         let interval = match configuration {
             Some(conf) => conf["interval"].as_f64().unwrap(),
@@ -335,7 +349,7 @@ impl Sink for ScalPongSink {
             .wait()
             .unwrap();
 
-        let state = ScalPongSinkState {
+        let state = Arc::new(ScalPongSinkState {
             _interval: interval,
             nodes,
             msgs,
@@ -344,31 +358,36 @@ impl Sink for ScalPongSink {
             data: vec![],
             diff,
             layer,
-        };
+        });
 
-        let input = inputs.remove(LAT_PORT).unwrap();
+        let input = inputs.take_into_arc(LAT_PORT).unwrap();
 
-        Ok(Some(Arc::new(move || async move {
-            if let Ok(Message::Data(mut msg)) = input.recv_async().await {
-                let data = msg.get_inner_data().try_get::<Latency>()?;
-                let now = get_epoch_us();
+        Ok(Some(Box::new(move || {
+            let c_input = input.clone();
+            let c_state = state.clone();
 
-                let elapsed = match state.diff {
-                    true => now - data.ts,
-                    false => data.ts,
-                };
-                let msgs = state.msgs;
-                let pipeline = state.nodes;
-                let layer = &state.layer;
-                println!("zenoh-flow,{layer},latency,{pipeline},8,{msgs},{elapsed},us");
+            async move {
+                if let Ok(Message::Data(mut msg)) = c_input.recv_async().await {
+                    let data = msg.get_inner_data().try_get::<Latency>()?;
+                    let now = get_epoch_us();
 
-                state
-                    .session
-                    .put(&state.expr, state.data.clone())
-                    .congestion_control(CongestionControl::Block)
-                    .await?;
+                    let elapsed = match c_state.diff {
+                        true => now - data.ts,
+                        false => data.ts,
+                    };
+                    let msgs = c_state.msgs;
+                    let pipeline = c_state.nodes;
+                    let layer = &c_state.layer;
+                    println!("zenoh-flow,{layer},latency,{pipeline},8,{msgs},{elapsed},us");
+
+                    c_state
+                        .session
+                        .put(&c_state.expr, c_state.data.clone())
+                        .congestion_control(CongestionControl::Block)
+                        .await?;
+                }
+                Ok(())
             }
-            Ok(())
         })))
     }
 }

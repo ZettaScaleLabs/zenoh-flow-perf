@@ -15,10 +15,10 @@
 use std::collections::HashMap;
 
 use clap::Parser;
-use zenoh_flow::model::dataflow::descriptor::FlattenDataFlowDescriptor;
-use zenoh_flow::model::link::{LinkDescriptor, PortDescriptor};
-use zenoh_flow::model::node::{SimpleOperatorDescriptor, SinkDescriptor, SourceDescriptor};
-use zenoh_flow::model::{InputDescriptor, OutputDescriptor};
+use zenoh_flow::model::descriptor::{
+    FlattenDataFlowDescriptor, InputDescriptor, LinkDescriptor, OperatorDescriptor,
+    OutputDescriptor, PortDescriptor, SinkDescriptor, SourceDescriptor,
+};
 use zenoh_flow::types::{NodeId, RuntimeId};
 use zenoh_flow_perf::runtime::Descriptor;
 
@@ -48,7 +48,7 @@ struct CallArgs {
     name: String,
     #[clap(short, long, default_value = DEFAULT_RT_DESCRIPTOR)]
     descriptor_file: String,
-    #[clap(short, long)]
+    #[clap(long)]
     ping: bool,
     #[clap(short, long)]
     listen: Vec<String>,
@@ -88,7 +88,6 @@ async fn main() {
         links: vec![],
         mapping: None,
         global_configuration: None,
-        flags: None,
     };
 
     // Source and Sink
@@ -105,7 +104,6 @@ async fn main() {
                 uri: Some(String::from(PING_SRC_URI)),
                 configuration: config.clone(),
                 tags: vec![],
-                flags: None,
             };
             let snk = SinkDescriptor {
                 id: "sink".into(),
@@ -116,7 +114,6 @@ async fn main() {
                 uri: Some(String::from(PONG_SNK_URI)),
                 configuration: config,
                 tags: vec![],
-                flags: None,
             };
             (src, snk)
         }
@@ -131,7 +128,6 @@ async fn main() {
                 uri: Some(String::from(SRC_URI)),
                 configuration: config.clone(),
                 tags: vec![],
-                flags: None,
             };
             let snk = SinkDescriptor {
                 id: "sink".into(),
@@ -142,7 +138,6 @@ async fn main() {
                 uri: Some(String::from(SNK_URI)),
                 configuration: config,
                 tags: vec![],
-                flags: None,
             };
             (src, snk)
         }
@@ -155,7 +150,7 @@ async fn main() {
     // Creating and adding operators to descriptors
 
     for i in 0..args.pipeline {
-        let op_descriptor = SimpleOperatorDescriptor {
+        let op_descriptor = OperatorDescriptor {
             id: format!("op-{i}").into(),
             inputs: vec![PortDescriptor {
                 port_id: PORT.into(),
@@ -168,7 +163,6 @@ async fn main() {
             uri: Some(String::from(NOOP_URI)),
             configuration: None,
             tags: vec![],
-            flags: None,
         };
         dfd.operators.push(op_descriptor);
     }

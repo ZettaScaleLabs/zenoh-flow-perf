@@ -18,7 +18,7 @@ use async_std::sync::Mutex;
 use async_trait::async_trait;
 use std::sync::Arc;
 use std::time::Duration;
-use zenoh::prelude::*;
+use zenoh::prelude::r#async::*;
 use zenoh::subscriber::Subscriber;
 use zenoh_flow::prelude::*;
 
@@ -68,14 +68,14 @@ impl Source for LatSource {
 pub struct PingSource;
 
 #[derive(Debug, Clone)]
-struct PingSourceState {
+struct PingSourceState<T> {
     interval: f64,
-    sub: Arc<Subscriber<'static>>,
+    sub: Arc<Subscriber<'static, T>>,
     first: bool,
 }
 
-impl PingSourceState {
-    fn new(interval: f64, sub: Subscriber<'static>) -> Self {
+impl<T> PingSourceState<T> {
+    fn new(interval: f64, sub: Subscriber<'static, T>) -> Self {
         Self {
             interval,
             sub: Arc::new(sub),
@@ -101,14 +101,15 @@ impl Source for PingSource {
         config
             .set_mode(Some(zenoh::config::whatami::WhatAmI::Peer))
             .unwrap();
-        let session = zenoh::open(config).wait().unwrap().into_arc();
+        let session = zenoh::open(config).res().await.unwrap().into_arc();
 
-        let key_expr_pong = session
-            .declare_expr("/test/latency/zf/pong")
-            .wait()
+        let key_expr = session
+            .declare_keyexpr("test/latency/zf/pong")
+            .res()
+            .await
             .unwrap();
 
-        let sub = session.subscribe(&key_expr_pong).wait().unwrap();
+        let sub = session.declare_subscriber(key_expr).res().await.unwrap();
 
         let state = Arc::new(Mutex::new(PingSourceState::new(interval, sub)));
 
@@ -184,14 +185,14 @@ impl Source for ThrSource {
 pub struct ScalPingSource;
 
 #[derive(Debug, Clone)]
-struct ScalPingSourceState {
+struct ScalPingSourceState<T> {
     interval: f64,
-    subs: Arc<Vec<Subscriber<'static>>>,
+    subs: Arc<Vec<Subscriber<'static, T>>>,
     first: bool,
 }
 
-impl ScalPingSourceState {
-    fn new(interval: f64, subs: Vec<Subscriber<'static>>) -> Self {
+impl<T> ScalPingSourceState<T> {
+    fn new(interval: f64, subs: Vec<Subscriber<'static, T>>) -> Self {
         Self {
             interval,
             subs: Arc::new(subs),
@@ -227,31 +228,38 @@ impl Source for ScalPingSource {
         config
             .set_mode(Some(zenoh::config::whatami::WhatAmI::Peer))
             .unwrap();
-        let session = zenoh::open(config).wait().unwrap().into_arc();
+        let session = zenoh::open(config).res().await.unwrap().into_arc();
 
         let mut key_exp_vec = vec![];
         let mut subs = vec![];
+
         if mode == 2 {
             // 2 means fan out, 1 means fan in
 
             for i in 0..nodes {
                 let key_expr_pong = session
-                    .declare_expr(format!("/test/latency/zf/pong/{i}"))
-                    .wait()
+                    .declare_keyexpr(format!("test/latency/zf/pong/{i}"))
+                    .res()
+                    .await
                     .unwrap();
                 key_exp_vec.push(key_expr_pong);
             }
 
             for kx in &key_exp_vec {
-                let sub = session.subscribe(kx).wait().unwrap();
+                let sub = session.declare_subscriber(kx).res().await.unwrap();
                 subs.push(sub);
             }
         } else {
             let key_expr_pong = session
-                .declare_expr("/test/latency/zf/pong/0")
-                .wait()
+                .declare_keyexpr("test/latency/zf/pong/0")
+                .res()
+                .await
                 .unwrap();
-            let sub = session.subscribe(key_expr_pong).wait().unwrap();
+            let sub = session
+                .declare_subscriber(key_expr_pong)
+                .res()
+                .await
+                .unwrap();
             subs.push(sub);
         }
 

@@ -12,35 +12,33 @@ categories = ["network-programming"]
 description = "Zenoh-Flow: zenoh-based data-flow programming framework for computations that span from the cloud to the device."
 readme = "README.md"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
-zenoh-flow = { git = "https://github.com/ZettaScaleLabs/zenoh-flow.git", branch = "dev/v0.4.0" }
 #zenoh-flow = { path = "../zf-zetta/zenoh-flow" }
-env_logger = "0.9"
-serde = { version = "1.0.55", features = ["derive"] }
-async-std = { version = "=1.11.0", features = ["attributes"] }
-typetag = "0.1"
-log = "0.4"
-bincode = "1"
-zenoh = { git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "master" }
-uhlc = "0.5"
-uuid = { version = "0.8", features = ["serde", "v4"] }
+async-std = { version = "=1.12.0", features = ["attributes"] }
 async-trait = "0.1.50"
+bincode = "1"
+env_logger = "0.9"
 futures = "0.3.5"
+log = "0.4"
 rand = "0.8.0"
+serde = { version = "1.0.55", features = ["derive"] }
 serde_json = "1.0.78"
+typetag = "0.1"
+uhlc = "0.5"
+uuid = { version = "1.1", features = ["serde", "v4"] }
+zenoh = { version = "0.6.0-beta.1" }
+zenoh-flow = { git = "https://github.com/ZettaScaleLabs/zenoh-flow.git", branch = "dev/v0.4.0" }
 
 [dev-dependencies]
-rand = "0.8.0"
-serde = { version = "1.0.55", features = ["derive"] }
-async-std = { version = "=1.11.0", features = ["attributes","unstable"] }
-futures = "0.3.5"
-flume = "0.10"
-serde_json = "1.0"
 async-ctrlc ={version = "1.2.0", features = ["stream"]}
+async-std = { version = "=1.12.0", features = ["attributes","unstable"] }
 async-trait = "0.1.50"
 clap = { version = "3.1", features = ["derive"] }
+flume = "0.10"
+futures = "0.3.5"
+rand = "0.8.0"
+serde = { version = "1.0.55", features = ["derive"] }
+serde_json = "1.0"
 uuid = { version = "0.8", features = ["serde", "v4"] }
 
 [[example]]

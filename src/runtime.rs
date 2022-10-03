@@ -18,6 +18,7 @@ use std::fs::File;
 use std::io::Write;
 use std::path::Path;
 use std::sync::Arc;
+use zenoh::prelude::r#async::*;
 use zenoh_flow::runtime::dataflow::loader::{Loader, LoaderConfig};
 use zenoh_flow::runtime::RuntimeContext;
 
@@ -26,10 +27,7 @@ pub enum Descriptor {
     Flatten(String),
 }
 
-fn _write_record_to_file(
-    record: zenoh_flow::model::dataflow::record::DataFlowRecord,
-    filename: &str,
-) {
+fn _write_record_to_file(record: zenoh_flow::model::record::DataFlowRecord, filename: &str) {
     let path = Path::new(filename);
     let mut write_file = File::create(path).unwrap();
     write!(write_file, "{}", record.to_yaml().unwrap()).unwrap();
@@ -57,7 +55,7 @@ pub async fn runtime(
         config.connect.endpoints.push(c.parse().unwrap());
     }
 
-    let session = Arc::new(zenoh::open(config).await.unwrap());
+    let session = zenoh::open(config).res().await.unwrap().into_arc();
     let hlc = async_std::sync::Arc::new(uhlc::HLC::default());
     let loader = Arc::new(Loader::new(loader_config));
 
@@ -74,14 +72,12 @@ pub async fn runtime(
         Descriptor::Composed(descriptor_file) => {
             let yaml_df = read_to_string(descriptor_file).unwrap();
             let df =
-                zenoh_flow::model::dataflow::descriptor::DataFlowDescriptor::from_yaml(&yaml_df)
-                    .unwrap();
+                zenoh_flow::model::descriptor::DataFlowDescriptor::from_yaml(&yaml_df).unwrap();
             df.flatten().await.unwrap()
         }
         Descriptor::Flatten(descriptor_file) => {
             let yaml_df = read_to_string(descriptor_file).unwrap();
-            zenoh_flow::model::dataflow::descriptor::FlattenDataFlowDescriptor::from_yaml(&yaml_df)
-                .unwrap()
+            zenoh_flow::model::descriptor::FlattenDataFlowDescriptor::from_yaml(&yaml_df).unwrap()
         }
     };
 
@@ -92,8 +88,7 @@ pub async fn runtime(
 
     // creating record
     let dfr =
-        zenoh_flow::model::dataflow::record::DataFlowRecord::try_from((mapped, uuid::Uuid::nil()))
-            .unwrap();
+        zenoh_flow::model::record::DataFlowRecord::try_from((mapped, uuid::Uuid::nil())).unwrap();
 
     _write_record_to_file(dfr.clone(), &format!("{}-record.yaml", dfr.flow));
 

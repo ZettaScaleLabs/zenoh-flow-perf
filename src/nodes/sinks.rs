@@ -15,11 +15,10 @@
 use crate::{get_epoch_us, Latency};
 use async_trait::async_trait;
 use futures::future::{AbortHandle, Abortable};
-use rand::Rng;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use zenoh::prelude::*;
+use zenoh::prelude::r#async::*;
 use zenoh::publication::CongestionControl;
 use zenoh_flow::prelude::*;
 
@@ -91,12 +90,12 @@ impl Sink for LatSink {
 pub struct PongSink;
 
 #[derive(Debug, Clone)]
-struct PongSinkState {
+struct PongSinkState<'a> {
     pipeline: u64,
     _interval: f64,
     msgs: u64,
     session: Arc<zenoh::Session>,
-    expr: ExprId,
+    expr: KeyExpr<'a>,
     data: Vec<u8>,
     layer: String,
 }
@@ -138,11 +137,12 @@ impl Sink for PongSink {
         config
             .set_mode(Some(zenoh::config::whatami::WhatAmI::Peer))
             .unwrap();
-        let session = zenoh::open(config).wait().unwrap().into_arc();
+        let session = zenoh::open(config).res().await.unwrap().into_arc();
 
         let expr = session
-            .declare_expr("/test/latency/zf/pong")
-            .wait()
+            .declare_keyexpr("test/latency/zf/pong")
+            .res()
+            .await
             .unwrap();
 
         let state = PongSinkState {
@@ -176,6 +176,7 @@ impl Sink for PongSink {
                         .session
                         .put(&c_state.expr, c_state.data.clone())
                         .congestion_control(CongestionControl::Block)
+                        .res()
                         .await?;
                 }
                 Ok(())
@@ -275,12 +276,12 @@ impl Sink for ThrSink {
 pub struct ScalPongSink;
 
 #[derive(Debug, Clone)]
-struct ScalPongSinkState {
+struct ScalPongSinkState<'a> {
     nodes: u64,
     _interval: f64,
     msgs: u64,
     session: Arc<zenoh::Session>,
-    expr: ExprId,
+    expr: KeyExpr<'a>,
     data: Vec<u8>,
     diff: bool,
     layer: String,
@@ -294,7 +295,7 @@ impl Sink for ScalPongSink {
         configuration: &Option<Configuration>,
         mut inputs: Inputs,
     ) -> Result<Option<Box<dyn AsyncIteration>>> {
-        let mut rng = rand::thread_rng();
+        // let mut rng = rand::thread_rng();
         let interval = match configuration {
             Some(conf) => conf["interval"].as_f64().unwrap(),
             None => 1.0f64,
@@ -337,16 +338,18 @@ impl Sink for ScalPongSink {
             .set_mode(Some(zenoh::config::whatami::WhatAmI::Peer))
             .unwrap();
 
-        let locator = format!("tcp/127.0.0.1:{}", rng.gen_range(8000..65000));
+        // let locator = format!("tcp/127.0.0.1:{}", rng.gen_range(8000..65000));
+        let locator = "tcp/127.0.0.1:49847";
         config
             .listen
             .set_endpoints(vec![locator.parse().unwrap()])
             .unwrap();
-        let session = zenoh::open(config).wait().unwrap().into_arc();
+        let session = zenoh::open(config).res().await.unwrap().into_arc();
 
         let expr = session
-            .declare_expr(format!("/test/latency/zf/pong/{node_id}"))
-            .wait()
+            .declare_keyexpr(format!("test/latency/zf/pong/{node_id}"))
+            .res()
+            .await
             .unwrap();
 
         let state = Arc::new(ScalPongSinkState {
@@ -384,6 +387,7 @@ impl Sink for ScalPongSink {
                         .session
                         .put(&c_state.expr, c_state.data.clone())
                         .congestion_control(CongestionControl::Block)
+                        .res()
                         .await?;
                 }
                 Ok(())

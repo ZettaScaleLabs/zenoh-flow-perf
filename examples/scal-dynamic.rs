@@ -16,10 +16,10 @@ use clap::Parser;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::str::FromStr;
-use zenoh_flow::model::dataflow::descriptor::FlattenDataFlowDescriptor;
-use zenoh_flow::model::link::{LinkDescriptor, PortDescriptor};
-use zenoh_flow::model::node::{SimpleOperatorDescriptor, SinkDescriptor, SourceDescriptor};
-use zenoh_flow::model::{InputDescriptor, OutputDescriptor};
+use zenoh_flow::model::descriptor::{
+    FlattenDataFlowDescriptor, InputDescriptor, LinkDescriptor, OperatorDescriptor,
+    OutputDescriptor, PortDescriptor, SinkDescriptor, SourceDescriptor,
+};
 use zenoh_flow::types::{NodeId, RuntimeId};
 use zenoh_flow_perf::nodes::LAT_PORT;
 use zenoh_flow_perf::runtime::Descriptor;
@@ -118,7 +118,6 @@ async fn main() {
         links: vec![],
         mapping: None,
         global_configuration: None,
-        flags: None,
     };
 
     // Source and Sink
@@ -132,7 +131,6 @@ async fn main() {
         uri: Some(String::from(PING_SRC_URI)),
         configuration: config.clone(),
         tags: vec![],
-        flags: None,
     };
 
     // Adding source and sinks to descriptor
@@ -154,14 +152,13 @@ async fn main() {
                 uri: Some(String::from(PONG_SNK_URI)),
                 configuration: sink_config,
                 tags: vec![],
-                flags: None,
             };
             dfd.sinks.push(sink_descriptor);
             mapping.insert("sink".into(), "snk".into());
 
             // creating nodes
             for i in 0..total_nodes {
-                let op_descriptor = SimpleOperatorDescriptor {
+                let op_descriptor = OperatorDescriptor {
                     id: format!("op-{i}").into(),
                     inputs: vec![PortDescriptor {
                         port_id: LAT_PORT.into(),
@@ -174,7 +171,6 @@ async fn main() {
                     uri: Some(String::from(NOOP_URI)),
                     configuration: None,
                     tags: vec![],
-                    flags: None,
                 };
                 dfd.operators.push(op_descriptor);
             }
@@ -189,7 +185,7 @@ async fn main() {
             }
 
             // creating last operator (fan-in)
-            let op_descriptor = SimpleOperatorDescriptor {
+            let op_descriptor = OperatorDescriptor {
                 id: "op-last".into(),
                 inputs,
                 outputs: vec![PortDescriptor {
@@ -199,7 +195,6 @@ async fn main() {
                 uri: Some(String::from(LASTOP_URI)),
                 configuration: None,
                 tags: vec![],
-                flags: None,
             };
 
             dfd.operators.push(op_descriptor);
@@ -257,7 +252,7 @@ async fn main() {
         FanKind::Out => {
             // Creating operators
             for i in 0..total_nodes {
-                let op_descriptor = SimpleOperatorDescriptor {
+                let op_descriptor = OperatorDescriptor {
                     id: format!("op-{i}").into(),
                     inputs: vec![PortDescriptor {
                         port_id: LAT_PORT.into(),
@@ -270,7 +265,6 @@ async fn main() {
                     uri: Some(String::from(NOOP_URI)),
                     configuration: None,
                     tags: vec![],
-                    flags: None,
                 };
                 dfd.operators.push(op_descriptor);
             }
@@ -291,7 +285,6 @@ async fn main() {
                     uri: Some(String::from(PONG_SNK_URI)),
                     configuration: Some(sink_config),
                     tags: vec![],
-                    flags: None,
                 };
 
                 dfd.sinks.push(sink_descriptor);

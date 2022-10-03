@@ -14,8 +14,8 @@
 
 use clap::Parser;
 use std::sync::Arc;
-use zenoh_flow::model::link::PortDescriptor;
-use zenoh_flow::model::{InputDescriptor, OutputDescriptor};
+use zenoh::prelude::r#async::*;
+use zenoh_flow::model::descriptor::{InputDescriptor, OutputDescriptor, PortDescriptor};
 use zenoh_flow::runtime::dataflow::instance::DataflowInstance;
 use zenoh_flow::runtime::dataflow::loader::{Loader, LoaderConfig};
 use zenoh_flow::runtime::RuntimeContext;
@@ -39,7 +39,12 @@ async fn main() {
 
     let args = CallArgs::parse();
 
-    let session = Arc::new(zenoh::open(zenoh::config::Config::default()).await.unwrap());
+    let session = Arc::new(
+        zenoh::open(zenoh::config::Config::default())
+            .res()
+            .await
+            .unwrap(),
+    );
     let hlc = async_std::sync::Arc::new(uhlc::HLC::default());
     let rt_uuid = uuid::Uuid::new_v4();
     let ctx = RuntimeContext {

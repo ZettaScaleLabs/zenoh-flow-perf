@@ -12,17 +12,11 @@
 //   ZettaScale zenoh team, <zenoh@zettascale.tech>
 //
 
-use async_std::task;
 use clap::Parser;
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Arc;
-// use zenoh_flow::runtime::dataflow::instance::link::link;
-use zenoh_flow::prelude::*;
 
 static DEFAULT_INT: &str = "1";
 static DEFAULT_SIZE: &str = "8";
 static DEFAULT_DURATION: &str = "60";
-use std::time::Duration;
 
 #[derive(Parser, Debug)]
 struct CallArgs {

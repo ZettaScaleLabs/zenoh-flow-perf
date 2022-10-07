@@ -16,7 +16,7 @@ use std::sync::Arc;
 use zenoh_flow::prelude::*;
 use zenoh_flow_perf::nodes::IRNoOp;
 
-export_operator!(register);
+// export_operator!(register);
 
 fn register() -> Result<Arc<dyn Operator>> {
     Ok(Arc::new(IRNoOp) as Arc<dyn Operator>)

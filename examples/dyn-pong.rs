@@ -16,7 +16,7 @@ use std::sync::Arc;
 use zenoh_flow::prelude::*;
 use zenoh_flow_perf::nodes::PongSink;
 
-export_sink!(register);
+// export_sink!(register);
 
 fn register() -> Result<Arc<dyn Sink>> {
     Ok(Arc::new(PongSink) as Arc<dyn Sink>)

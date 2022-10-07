@@ -12,7 +12,6 @@
 //   ZettaScale zenoh team, <zenoh@zettascale.tech>
 //
 
-use async_std::sync::Mutex;
 use clap::Parser;
 use std::{sync::Arc, time::Duration};
 use zenoh::prelude::r#async::*;
@@ -55,7 +54,7 @@ struct LatSource {
 
 #[async_trait::async_trait]
 impl Node for LatSource {
-    async fn iteration(&mut self) -> Result<()> {
+    async fn iteration(&self) -> Result<()> {
         async_std::task::sleep(self.sleep_interval).await;
         let data = Data::from(Latency { ts: get_epoch_us() });
         self.output.send_async(data, None).await
@@ -71,7 +70,7 @@ impl SourceFactory for LatSourceFactory {
         _context: &mut Context,
         configuration: &Option<Configuration>,
         mut outputs: Outputs,
-    ) -> Result<Option<Arc<Mutex<dyn Node>>>> {
+    ) -> Result<Option<Arc<dyn Node>>> {
         let interval = match configuration {
             Some(config) => config["interval"].as_f64().unwrap(),
             None => 1.0f64,
@@ -80,10 +79,10 @@ impl SourceFactory for LatSourceFactory {
         let sleep_interval = Duration::from_secs_f64(interval);
         let output = outputs.take(OUTPUT).expect("No output `out`");
 
-        Ok(Some(Arc::new(Mutex::new(LatSource {
+        Ok(Some(Arc::new(LatSource {
             sleep_interval,
             output,
-        }))))
+        })))
     }
 }
 
@@ -99,7 +98,7 @@ struct NoOp {
 
 #[async_trait::async_trait]
 impl Node for NoOp {
-    async fn iteration(&mut self) -> Result<()> {
+    async fn iteration(&self) -> Result<()> {
         if let Ok(Message::Data(mut message)) = self.input.recv_async().await {
             self.output
                 .send_async(message.get_inner_data().clone(), None)
@@ -121,11 +120,11 @@ impl OperatorFactory for NoOpFactory {
         _configuration: &Option<Configuration>,
         mut inputs: Inputs,
         mut outputs: Outputs,
-    ) -> Result<Option<Arc<Mutex<dyn Node>>>> {
-        Ok(Some(Arc::new(Mutex::new(NoOp {
+    ) -> Result<Option<Arc<dyn Node>>> {
+        Ok(Some(Arc::new(NoOp {
             input: inputs.take(INPUT).unwrap(),
             output: outputs.take(OUTPUT).unwrap(),
-        }))))
+        })))
     }
 }
 
@@ -143,7 +142,7 @@ struct LatSink {
 
 #[async_trait::async_trait]
 impl Node for LatSink {
-    async fn iteration(&mut self) -> Result<()> {
+    async fn iteration(&self) -> Result<()> {
         if let Ok(Message::Data(mut message)) = self.input.recv_async().await {
             let data = message.get_inner_data().try_get::<Latency>()?;
             let now = get_epoch_us();
@@ -167,7 +166,7 @@ impl SinkFactory for LatSinkFactory {
         _context: &mut Context,
         configuration: &Option<Configuration>,
         mut inputs: Inputs,
-    ) -> Result<Option<Arc<Mutex<dyn Node>>>> {
+    ) -> Result<Option<Arc<dyn Node>>> {
         let pipeline = match configuration {
             Some(conf) => conf["pipeline"].as_u64().unwrap(),
             None => 1,
@@ -180,11 +179,11 @@ impl SinkFactory for LatSinkFactory {
 
         let input = inputs.take(INPUT).unwrap();
 
-        Ok(Some(Arc::new(Mutex::new(LatSink {
+        Ok(Some(Arc::new(LatSink {
             input,
             pipeline,
             messages,
-        }))))
+        })))
     }
 }
 

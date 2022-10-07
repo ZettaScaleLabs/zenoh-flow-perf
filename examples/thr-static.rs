@@ -12,7 +12,6 @@
 //   ZettaScale zenoh team, <zenoh@zettascale.tech>
 //
 
-use async_std::sync::Mutex;
 use clap::Parser;
 use futures::stream::{AbortHandle, Abortable};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -53,7 +52,7 @@ struct ThrSource {
 
 #[async_trait::async_trait]
 impl Node for ThrSource {
-    async fn iteration(&mut self) -> Result<()> {
+    async fn iteration(&self) -> Result<()> {
         self.output
             .send_async(Data::from(Arc::clone(&self.data)), None)
             .await
@@ -69,7 +68,7 @@ impl SourceFactory for ThrSourceFactory {
         _context: &mut Context,
         configuration: &Option<Configuration>,
         mut outputs: Outputs,
-    ) -> Result<Option<Arc<Mutex<dyn Node>>>> {
+    ) -> Result<Option<Arc<dyn Node>>> {
         let payload_size = match configuration {
             Some(conf) => conf["payload_size"].as_u64().unwrap() as usize,
             None => 8usize,
@@ -82,7 +81,7 @@ impl SourceFactory for ThrSourceFactory {
         });
         let output = outputs.take(OUTPUT).expect("No output `out`");
 
-        Ok(Some(Arc::new(Mutex::new(ThrSource { output, data }))))
+        Ok(Some(Arc::new(ThrSource { output, data })))
     }
 }
 
@@ -98,7 +97,7 @@ struct NoOp {
 
 #[async_trait::async_trait]
 impl Node for NoOp {
-    async fn iteration(&mut self) -> Result<()> {
+    async fn iteration(&self) -> Result<()> {
         if let Ok(Message::Data(mut message)) = self.input.recv_async().await {
             self.output
                 .send_async(message.get_inner_data().clone(), None)
@@ -120,11 +119,11 @@ impl OperatorFactory for NoOpFactory {
         _configuration: &Option<Configuration>,
         mut inputs: Inputs,
         mut outputs: Outputs,
-    ) -> Result<Option<Arc<Mutex<dyn Node>>>> {
-        Ok(Some(Arc::new(Mutex::new(NoOp {
+    ) -> Result<Option<Arc<dyn Node>>> {
+        Ok(Some(Arc::new(NoOp {
             input: inputs.take(INPUT).unwrap(),
             output: outputs.take(OUTPUT).unwrap(),
-        }))))
+        })))
     }
 }
 
@@ -141,7 +140,7 @@ struct ThrSink {
 
 #[async_trait::async_trait]
 impl Node for ThrSink {
-    async fn iteration(&mut self) -> Result<()> {
+    async fn iteration(&self) -> Result<()> {
         if let Ok(Message::Data(_)) = self.input.recv_async().await {
             self.accumulator.fetch_add(1, Ordering::Relaxed);
         }
@@ -159,7 +158,7 @@ impl SinkFactory for ThrSinkFactory {
         _context: &mut Context,
         configuration: &Option<Configuration>,
         mut inputs: Inputs,
-    ) -> Result<Option<Arc<Mutex<dyn Node>>>> {
+    ) -> Result<Option<Arc<dyn Node>>> {
         let payload_size = match configuration {
             Some(conf) => conf["payload_size"].as_u64().unwrap() as usize,
             None => 8usize,
@@ -207,11 +206,11 @@ impl SinkFactory for ThrSinkFactory {
 
         let input = inputs.take(INPUT).unwrap();
 
-        Ok(Some(Arc::new(Mutex::new(ThrSink {
+        Ok(Some(Arc::new(ThrSink {
             input,
             _abort_handle,
             accumulator,
-        }))))
+        })))
     }
 }
 

@@ -13,7 +13,6 @@ description = "Zenoh-Flow: zenoh-based data-flow programming framework for compu
 readme = "README.md"
 
 [dependencies]
-#zenoh-flow = { path = "../zf-zetta/zenoh-flow" }
 async-std = { version = "=1.12.0", features = ["attributes"] }
 async-trait = "0.1.50"
 bincode = "1"

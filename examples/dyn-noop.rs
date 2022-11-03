@@ -14,10 +14,10 @@
 
 use std::sync::Arc;
 use zenoh_flow::prelude::*;
-use zenoh_flow_perf::nodes::NoOp;
+use zenoh_flow_perf::nodes::NoOpFactory;
 
-export_operator!(register);
+export_operator_factory!(register);
 
-fn register() -> Result<Arc<dyn Operator>> {
-    Ok(Arc::new(NoOp) as Arc<dyn Operator>)
+fn register() -> Result<Arc<dyn OperatorFactoryTrait>> {
+    Ok(Arc::new(NoOpFactory) as Arc<dyn OperatorFactoryTrait>)
 }

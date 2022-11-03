@@ -93,33 +93,34 @@ pub async fn runtime(
     _write_record_to_file(dfr.clone(), &format!("{}-record.yaml", dfr.flow));
 
     // creating dataflow
-    let dataflow = zenoh_flow::runtime::dataflow::Dataflow::try_new(ctx.clone(), dfr).unwrap();
+    let dataflow = zenoh_flow::runtime::dataflow::DataFlow::try_new(dfr, ctx.clone()).unwrap();
 
     // instantiating
-    let mut instance = zenoh_flow::runtime::dataflow::instance::DataflowInstance::try_instantiate(
+    let mut instance = zenoh_flow::runtime::dataflow::instance::DataFlowInstance::try_instantiate(
         dataflow,
         ctx.hlc.clone(),
     )
+    .await
     .unwrap();
 
     let mut sinks = instance.get_sinks();
     for id in sinks.drain(..) {
-        instance.start_node(&id).await.unwrap()
+        instance.start_node(&id).unwrap()
     }
 
     let mut operators = instance.get_operators();
     for id in operators.drain(..) {
-        instance.start_node(&id).await.unwrap()
+        instance.start_node(&id).unwrap()
     }
 
     let mut connectors = instance.get_connectors();
     for id in connectors.drain(..) {
-        instance.start_node(&id).await.unwrap()
+        instance.start_node(&id).unwrap()
     }
 
     let sources = instance.get_sources();
     for id in &sources {
-        instance.start_node(id).await.unwrap()
+        instance.start_node(id).unwrap()
     }
 
     std::future::pending::<()>().await;

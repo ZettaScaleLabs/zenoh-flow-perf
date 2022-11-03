@@ -18,80 +18,76 @@ use async_std::sync::Mutex;
 use async_trait::async_trait;
 use std::sync::Arc;
 use std::time::Duration;
-use zenoh::prelude::r#async::*;
-use zenoh::subscriber::Subscriber;
+use zenoh::{prelude::r#async::*, subscriber::FlumeSubscriber};
 use zenoh_flow::prelude::*;
 
 use super::{LAT_PORT, THR_PORT};
 
-// Latency SOURCE
-#[derive(Debug)]
-pub struct LatSource;
+/*
+ ***************************************************************************************************
+ *
+ *  LATENCY
+ *
+ ***************************************************************************************************
+ */
 
-#[derive(Debug, Clone)]
-struct LatSourceState {
-    interval: f64,
+pub struct LatSource {
+    sleep_interval: Duration,
+    output: Output,
 }
 
-#[async_trait]
-impl Source for LatSource {
-    async fn setup(
+#[async_trait::async_trait]
+impl Node for LatSource {
+    async fn iteration(&self) -> Result<()> {
+        async_std::task::sleep(self.sleep_interval).await;
+        let data = Data::from(Latency { ts: get_epoch_us() });
+        self.output.send_async(data, None).await
+    }
+}
+
+pub struct LatSourceFactory;
+
+#[async_trait::async_trait]
+impl SourceFactoryTrait for LatSourceFactory {
+    async fn new_source(
         &self,
-        _ctx: &mut Context,
+        _context: &mut Context,
         configuration: &Option<Configuration>,
         mut outputs: Outputs,
-    ) -> Result<Option<Box<dyn AsyncIteration>>> {
+    ) -> Result<Option<Arc<dyn Node>>> {
         let interval = match configuration {
-            Some(conf) => conf["interval"].as_f64().unwrap(),
+            Some(config) => config["interval"].as_f64().unwrap(),
             None => 1.0f64,
         };
 
-        let state = Arc::new(LatSourceState { interval });
-        let output = outputs.take_into_arc(LAT_PORT).unwrap();
+        let sleep_interval = Duration::from_secs_f64(interval);
+        let output = outputs.take(LAT_PORT).expect("Missing output $LAT_PORT");
 
-        Ok(Some(Box::new(move || {
-            let c_state = state.clone();
-            let c_output = output.clone();
-
-            async move {
-                async_std::task::sleep(Duration::from_secs_f64(c_state.interval)).await;
-                let data = Data::from(Latency { ts: get_epoch_us() });
-                c_output.send_async(data, None).await
-            }
+        Ok(Some(Arc::new(LatSource {
+            sleep_interval,
+            output,
         })))
     }
 }
 
-// Ping SOURCE
+/*
+ ***************************************************************************************************
+ *
+ *  PING
+ *
+ ***************************************************************************************************
+ */
 
-#[derive(Debug)]
-pub struct PingSource;
-
-#[derive(Debug, Clone)]
-struct PingSourceState<T> {
-    interval: f64,
-    sub: Arc<Subscriber<'static, T>>,
-    first: bool,
-}
-
-impl<T> PingSourceState<T> {
-    fn new(interval: f64, sub: Subscriber<'static, T>) -> Self {
-        Self {
-            interval,
-            sub: Arc::new(sub),
-            first: true,
-        }
-    }
-}
+pub struct PingSourceFactory;
 
 #[async_trait]
-impl Source for PingSource {
-    async fn setup(
+impl SourceFactoryTrait for PingSourceFactory {
+    async fn new_source(
         &self,
-        _ctx: &mut Context,
+        _context: &mut Context,
         configuration: &Option<Configuration>,
         mut outputs: Outputs,
-    ) -> Result<Option<Box<dyn AsyncIteration>>> {
+    ) -> Result<Option<Arc<dyn Node>>> {
         let interval = match configuration {
             Some(conf) => conf["interval"].as_f64().unwrap(),
             None => 1.0f64,
@@ -113,46 +109,69 @@ impl Source for PingSource {
 
         let state = Arc::new(Mutex::new(PingSourceState::new(interval, sub)));
 
-        let output = outputs.take_into_arc(LAT_PORT).unwrap();
+        let output = outputs.take(LAT_PORT).unwrap();
 
-        Ok(Some(Box::new(move || {
-            let c_output = output.clone();
-            let c_state = state.clone();
-
-            async move {
-                let mut c_state = c_state.lock().await;
-                async_std::task::sleep(Duration::from_secs_f64(c_state.interval)).await;
-                if !c_state.first {
-                    let _ = c_state.sub.recv();
-                } else {
-                    c_state.first = false;
-                }
-
-                let data = Data::from(Latency { ts: get_epoch_us() });
-                c_output.send_async(data, None).await
-            }
-        })))
+        Ok(Some(Arc::new(PingSource { state, output })))
     }
 }
 
-// THR SOURCE
-
-#[derive(Debug)]
-pub struct ThrSource;
-
-#[derive(Debug, Clone)]
-struct ThrSourceState {
-    pub data: Arc<ThrData>,
+pub struct PingSource<'a> {
+    state: Arc<Mutex<PingSourceState<'a>>>,
+    output: Output,
 }
 
 #[async_trait]
-impl Source for ThrSource {
-    async fn setup(
+impl<'a> Node for PingSource<'a> {
+    async fn iteration(&self) -> Result<()> {
+        let mut state = self.state.lock().await;
+        async_std::task::sleep(Duration::from_secs_f64(state.interval)).await;
+        if !state.first {
+            let _ = state.sub.recv();
+        } else {
+            state.first = false;
+        }
+
+        let data = Data::from(Latency { ts: get_epoch_us() });
+        self.output.send_async(data, None).await?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone)]
+struct PingSourceState<'a> {
+    interval: f64,
+    sub: Arc<FlumeSubscriber<'a>>,
+    first: bool,
+}
+
+impl<'a> PingSourceState<'a> {
+    fn new(interval: f64, sub: FlumeSubscriber<'a>) -> Self {
+        Self {
+            interval,
+            sub: Arc::new(sub),
+            first: true,
+        }
+    }
+}
+
+/*
+ ***************************************************************************************************
+ *
+ *  THROUGHPUT
+ *
+ ***************************************************************************************************
+ */
+
+pub struct ThrSourceFactory;
+
+#[async_trait]
+impl SourceFactoryTrait for ThrSourceFactory {
+    async fn new_source(
         &self,
-        _ctx: &mut Context,
+        _context: &mut Context,
         configuration: &Option<Configuration>,
         mut outputs: Outputs,
-    ) -> Result<Option<Box<dyn AsyncIteration>>> {
+    ) -> Result<Option<Arc<dyn Node>>> {
         let payload_size = match configuration {
             Some(conf) => conf["payload_size"].as_u64().unwrap() as usize,
             None => 8usize,
@@ -164,51 +183,44 @@ impl Source for ThrSource {
                 .collect::<Vec<u8>>(),
         });
 
-        let state = Arc::new(ThrSourceState { data });
-        let output = outputs.take_into_arc(THR_PORT).unwrap();
+        let output = outputs.take(THR_PORT).unwrap();
 
-        Ok(Some(Box::new(move || {
-            let c_output = output.clone();
-            let c_state = state.clone();
-            async move {
-                let data = c_state.data.clone();
-                let data = Data::from(data);
-                c_output.send_async(data, None).await
-            }
-        })))
+        Ok(Some(Arc::new(ThrSource { data, output })))
     }
 }
 
-// Scalability Ping SOURCE
-
-#[derive(Debug)]
-pub struct ScalPingSource;
-
-#[derive(Debug, Clone)]
-struct ScalPingSourceState<T> {
-    interval: f64,
-    subs: Arc<Vec<Subscriber<'static, T>>>,
-    first: bool,
-}
-
-impl<T> ScalPingSourceState<T> {
-    fn new(interval: f64, subs: Vec<Subscriber<'static, T>>) -> Self {
-        Self {
-            interval,
-            subs: Arc::new(subs),
-            first: true,
-        }
-    }
+pub struct ThrSource {
+    data: Arc<ThrData>,
+    output: Output,
 }
 
 #[async_trait]
-impl Source for ScalPingSource {
-    async fn setup(
+impl Node for ThrSource {
+    async fn iteration(&self) -> Result<()> {
+        self.output
+            .send_async(Data::from(self.data.clone()), None)
+            .await
+    }
+}
+
+/*
+ ***************************************************************************************************
+ *
+ *  SCALABILITY SOURCE
+ *
+ ***************************************************************************************************
+ */
+
+pub struct ScalPingSourceFactory;
+
+#[async_trait]
+impl SourceFactoryTrait for ScalPingSourceFactory {
+    async fn new_source(
         &self,
         _ctx: &mut Context,
         configuration: &Option<Configuration>,
         mut outputs: Outputs,
-    ) -> Result<Option<Box<dyn AsyncIteration>>> {
+    ) -> Result<Option<Arc<dyn Node>>> {
         let interval = match configuration {
             Some(conf) => conf["interval"].as_f64().unwrap(),
             None => 1.0f64,
@@ -265,26 +277,48 @@ impl Source for ScalPingSource {
 
         let state = Arc::new(Mutex::new(ScalPingSourceState::new(interval, subs)));
 
-        let output = outputs.take_into_arc(LAT_PORT).unwrap();
+        let output = outputs.take(LAT_PORT).unwrap();
 
-        Ok(Some(Box::new(move || {
-            let c_state = state.clone();
-            let c_output = output.clone();
+        Ok(Some(Arc::new(ScalPingSource { state, output })))
+    }
+}
 
-            async move {
-                let mut c_state = c_state.lock().await;
-                async_std::task::sleep(Duration::from_secs_f64(c_state.interval)).await;
-                if !c_state.first {
-                    for sub in &*c_state.subs {
-                        let _ = sub.recv();
-                    }
-                } else {
-                    c_state.first = false;
-                }
+pub struct ScalPingSource<'a> {
+    state: Arc<Mutex<ScalPingSourceState<'a>>>,
+    output: Output,
+}
 
-                let data = Data::from(Latency { ts: get_epoch_us() });
-                c_output.send_async(data, None).await
+#[async_trait]
+impl<'a> Node for ScalPingSource<'a> {
+    async fn iteration(&self) -> Result<()> {
+        let mut state = self.state.lock().await;
+        async_std::task::sleep(Duration::from_secs_f64(state.interval)).await;
+        if !state.first {
+            for sub in &*state.subs {
+                let _ = sub.recv();
             }
-        })))
+        } else {
+            state.first = false;
+        }
+
+        let data = Data::from(Latency { ts: get_epoch_us() });
+        self.output.send_async(data, None).await
+    }
+}
+
+#[derive(Debug, Clone)]
+struct ScalPingSourceState<'a> {
+    interval: f64,
+    subs: Arc<Vec<FlumeSubscriber<'a>>>,
+    first: bool,
+}
+
+impl<'a> ScalPingSourceState<'a> {
+    fn new(interval: f64, subs: Vec<FlumeSubscriber<'a>>) -> Self {
+        Self {
+            interval,
+            subs: Arc::new(subs),
+            first: true,
+        }
     }
 }

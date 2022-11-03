@@ -14,10 +14,10 @@
 
 use std::sync::Arc;
 use zenoh_flow::prelude::*;
-use zenoh_flow_perf::nodes::LatSource;
+use zenoh_flow_perf::nodes::LatSourceFactory;
 
-export_source!(register);
+export_source_factory!(register);
 
-fn register() -> Result<Arc<dyn Source>> {
-    Ok(Arc::new(LatSource) as Arc<dyn Source>)
+fn register() -> Result<Arc<dyn SourceFactoryTrait>> {
+    Ok(Arc::new(LatSourceFactory) as Arc<dyn SourceFactoryTrait>)
 }

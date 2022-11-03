@@ -14,10 +14,10 @@
 
 use std::sync::Arc;
 use zenoh_flow::prelude::*;
-use zenoh_flow_perf::nodes::ThrSink;
+use zenoh_flow_perf::nodes::ThrSinkFactory;
 
-export_sink!(register);
+export_sink_factory!(register);
 
-fn register() -> Result<Arc<dyn Sink>> {
-    Ok(Arc::new(ThrSink) as Arc<dyn Sink>)
+fn register() -> Result<Arc<dyn SinkFactoryTrait>> {
+    Ok(Arc::new(ThrSinkFactory) as Arc<dyn SinkFactoryTrait>)
 }

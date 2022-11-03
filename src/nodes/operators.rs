@@ -18,41 +18,58 @@ use async_trait::async_trait;
 use std::sync::Arc;
 use zenoh_flow::prelude::*;
 
-// Latency OPERATOR
+/*
+ ***************************************************************************************************
+ *
+ * LATENCY OPERATOR
+ *
+ ***************************************************************************************************
+ */
 
-#[derive(Debug)]
-pub struct NoOp;
+pub struct NoOp {
+    input: Input,
+    output: Output,
+}
 
-#[async_trait]
-impl Operator for NoOp {
-    async fn setup(
+#[async_trait::async_trait]
+impl Node for NoOp {
+    async fn iteration(&self) -> Result<()> {
+        if let Ok(Message::Data(mut message)) = self.input.recv_async().await {
+            self.output
+                .send_async(message.get_inner_data().clone(), None)
+                .await
+                .unwrap();
+        }
+
+        Ok(())
+    }
+}
+
+pub struct NoOpFactory;
+
+#[async_trait::async_trait]
+impl OperatorFactoryTrait for NoOpFactory {
+    async fn new_operator(
         &self,
-        _ctx: &mut Context,
+        _context: &mut Context,
         _configuration: &Option<Configuration>,
         mut inputs: Inputs,
         mut outputs: Outputs,
-    ) -> Result<Option<Box<dyn AsyncIteration>>> {
-        let input = inputs.take_into_arc(LAT_PORT).unwrap();
-        let output = outputs.take_into_arc(LAT_PORT).unwrap();
-
-        Ok(Some(Box::new(move || {
-            let c_input = input.clone();
-            let c_output = output.clone();
-
-            async move {
-                if let Ok(Message::Data(mut msg)) = c_input.recv_async().await {
-                    c_output
-                        .send_async(msg.get_inner_data().clone(), None)
-                        .await
-                        .unwrap();
-                }
-                Ok(())
-            }
+    ) -> Result<Option<Arc<dyn Node>>> {
+        Ok(Some(Arc::new(NoOp {
+            input: inputs.take(LAT_PORT).unwrap(),
+            output: outputs.take(LAT_PORT).unwrap(),
         })))
     }
 }
 
-// OPERATOR
+/*
+ ***************************************************************************************************
+ *
+ * NO OPERATOR PRINT
+ *
+ ***************************************************************************************************
+ */
 
 #[derive(Debug, Clone)]
 struct LatOpState {
@@ -63,17 +80,39 @@ struct LatOpState {
 }
 
 #[derive(Debug)]
-pub struct NoOpPrint;
+pub struct NoOpPrint {
+    input: Input,
+    state: Arc<LatOpState>,
+}
 
 #[async_trait]
-impl Operator for NoOpPrint {
-    async fn setup(
+impl Node for NoOpPrint {
+    async fn iteration(&self) -> Result<()> {
+        if let Ok(Message::Data(mut msg)) = self.input.recv_async().await {
+            let data = msg.get_inner_data().try_get::<Latency>()?;
+            let now = get_epoch_us();
+
+            let elapsed = now - data.ts;
+            let msgs = self.state.msgs;
+            let pipeline = self.state.pipeline;
+            let layer = &self.state.layer;
+            println!("{layer},scenario,latency,pipeline,{msgs},{pipeline},{elapsed},us");
+        }
+        Ok(())
+    }
+}
+
+pub struct NoOpPrintFactory;
+
+#[async_trait]
+impl OperatorFactoryTrait for NoOpPrintFactory {
+    async fn new_operator(
         &self,
         _ctx: &mut Context,
         configuration: &Option<Configuration>,
         mut inputs: Inputs,
         mut _outputs: Outputs,
-    ) -> Result<Option<Box<dyn AsyncIteration>>> {
+    ) -> Result<Option<Arc<dyn Node>>> {
         let interval = match configuration {
             Some(conf) => conf["interval"].as_f64().unwrap(),
             None => 1.0f64,
@@ -106,104 +145,131 @@ impl Operator for NoOpPrint {
             layer,
         });
 
-        let input = inputs.take_into_arc(LAT_PORT).unwrap();
+        let input = inputs.take(LAT_PORT).unwrap();
 
-        Ok(Some(Box::new(move || {
-            let c_input = input.clone();
-            let c_state = state.clone();
-
-            async move {
-                if let Ok(Message::Data(mut msg)) = c_input.recv_async().await {
-                    let data = msg.get_inner_data().try_get::<Latency>()?;
-                    let now = get_epoch_us();
-
-                    let elapsed = now - data.ts;
-                    let msgs = c_state.msgs;
-                    let pipeline = c_state.pipeline;
-                    let layer = &c_state.layer;
-                    println!("{layer},scenario,latency,pipeline,{msgs},{pipeline},{elapsed},us");
-                }
-                Ok(())
-            }
-        })))
+        Ok(Some(Arc::new(NoOpPrint { state, input })))
     }
 }
 
-// THR OPERATOR
+/*
+ ***************************************************************************************************
+ *
+ * THROUGHPUT OPERATOR
+ *
+ ***************************************************************************************************
+ */
 
-#[derive(Debug)]
-pub struct ThrNoOp;
+pub struct ThrNoOp {
+    input: Input,
+    output: Output,
+}
+
 #[async_trait]
-impl Operator for ThrNoOp {
-    async fn setup(
+impl Node for ThrNoOp {
+    async fn iteration(&self) -> Result<()> {
+        if let Ok(Message::Data(mut msg)) = self.input.recv_async().await {
+            self.output
+                .send_async(msg.get_inner_data().clone(), None)
+                .await
+                .unwrap();
+        }
+        Ok(())
+    }
+}
+
+pub struct ThrNoOpFactory;
+
+#[async_trait]
+impl OperatorFactoryTrait for ThrNoOpFactory {
+    async fn new_operator(
         &self,
         _ctx: &mut Context,
         _configuration: &Option<Configuration>,
         mut inputs: Inputs,
         mut outputs: Outputs,
-    ) -> Result<Option<Box<dyn AsyncIteration>>> {
-        let input = inputs.take_into_arc(THR_PORT).unwrap();
-        let output = outputs.take_into_arc(THR_PORT).unwrap();
+    ) -> Result<Option<Arc<dyn Node>>> {
+        let input = inputs.take(THR_PORT).unwrap();
+        let output = outputs.take(THR_PORT).unwrap();
 
-        Ok(Some(Box::new(move || {
-            let c_input = input.clone();
-            let c_output = output.clone();
-
-            async move {
-                if let Ok(Message::Data(mut msg)) = c_input.recv_async().await {
-                    c_output
-                        .send_async(msg.get_inner_data().clone(), None)
-                        .await
-                        .unwrap();
-                }
-                Ok(())
-            }
-        })))
+        Ok(Some(Arc::new(ThrNoOp { input, output })))
     }
 }
 
-#[derive(Debug, Clone)]
-struct IROpState {
-    _inputs: u64,
+/*
+ ***************************************************************************************************
+ *
+ * LAST OPERATOR FOR SCALABILITY STATIC
+ *
+ ***************************************************************************************************
+ */
+
+pub struct ScalNoOp {
+    inputs: Vec<Input>,
+    output: Output,
 }
 
-// OPERATOR
-
-#[derive(Debug)]
-pub struct IRNoOp;
 #[async_trait]
-impl Operator for IRNoOp {
-    async fn setup(
+impl Node for ScalNoOp {
+    async fn iteration(&self) -> Result<()> {
+        let fut_inputs: Vec<_> = self.inputs.iter().map(|input| input.recv_async()).collect();
+        let data = futures::future::try_join_all(fut_inputs)
+            .await?
+            // Get the first one from the list --- we know it’s the first one because `try_join_all`
+            // preserves the order.
+            .pop()
+            .expect("ScalNoOp received no data");
+
+        match data {
+            Message::Data(mut d) => {
+                let latency = d.get_inner_data().try_get::<Latency>()?;
+                let now = get_epoch_us();
+                let elapsed = now - latency.ts;
+
+                let data_to_send = Data::from(Latency { ts: elapsed });
+
+                self.output.send_async(data_to_send, None).await
+            }
+            Message::Watermark(_) => panic!("Watermark message unsupported"),
+            _ => panic!("Unimplemented"),
+        }
+    }
+}
+
+pub struct ScalNoOpFactory;
+
+#[async_trait]
+impl OperatorFactoryTrait for ScalNoOpFactory {
+    async fn new_operator(
         &self,
         _ctx: &mut Context,
         configuration: &Option<Configuration>,
         mut inputs: Inputs,
         mut outputs: Outputs,
-    ) -> Result<Option<Box<dyn AsyncIteration>>> {
-        let op_inputs = match configuration {
-            Some(conf) => conf["inputs"].as_u64().unwrap(),
-            None => 1,
+    ) -> Result<Option<Arc<dyn Node>>> {
+        let ins: Vec<Input> = match configuration {
+            Some(configuration) => {
+                let port_ids = configuration["port_ids"]
+                    .as_array()
+                    .expect("port_ids should be an array");
+                port_ids
+                    .iter()
+                    .map(|val| {
+                        let port_id = val.as_str().expect("value should be a string");
+                        match inputs.take(port_id) {
+                            Some(input) => input,
+                            None => panic!("Input < {} > not found", port_id),
+                        }
+                    })
+                    .collect()
+            }
+            None => panic!("The port_ids of the inputs must be specified for this operator"),
         };
 
-        let _state = IROpState { _inputs: op_inputs };
-
-        let input = inputs.take_into_arc("Data0").unwrap();
-        let output = outputs.take_into_arc(LAT_PORT).unwrap();
-        Ok(Some(Box::new(move || {
-            let c_input = input.clone();
-            let c_output = output.clone();
-
-            async move {
-                if let Ok(Message::Data(mut msg)) = c_input.recv_async().await {
-                    let data = msg.get_inner_data().try_get::<Latency>()?;
-                    let now = get_epoch_us();
-
-                    let elapsed = now - data.ts;
-                    let data = Data::from(Latency { ts: elapsed });
-                    c_output.send_async(data, None).await.unwrap();
-                }
-                Ok(())
-            }
+        Ok(Some(Arc::new(ScalNoOp {
+            inputs: ins,
+            output: outputs
+                .take(LAT_PORT)
+                .expect("Output LAT_PORT should exist"),
         })))
     }
 }

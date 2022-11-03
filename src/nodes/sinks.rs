@@ -24,90 +24,125 @@ use zenoh_flow::prelude::*;
 
 use super::{LAT_PORT, THR_PORT};
 
-// Latency SINK
-pub struct LatSink;
+/*
+ ***************************************************************************************************
+ *
+ * LATENCY SINK
+ *
+ ***************************************************************************************************
+ */
 
-#[derive(Debug, Clone)]
-struct LatSinkState {
+pub struct LatSink {
+    input: Input,
     pipeline: u64,
-    _interval: f64,
-    msgs: u64,
+    messages: u64,
 }
 
-#[async_trait]
-impl Sink for LatSink {
-    async fn setup(
+#[async_trait::async_trait]
+impl Node for LatSink {
+    async fn iteration(&self) -> Result<()> {
+        if let Ok(Message::Data(mut message)) = self.input.recv_async().await {
+            let data = message.get_inner_data().try_get::<Latency>()?;
+            let now = get_epoch_us();
+            let elapsed = now - data.ts;
+            println!(
+                "zenoh-flow,single,latency,{},8,{},{elapsed},us",
+                self.pipeline, self.messages
+            );
+        }
+
+        Ok(())
+    }
+}
+
+pub struct LatSinkFactory;
+
+#[async_trait::async_trait]
+impl SinkFactoryTrait for LatSinkFactory {
+    async fn new_sink(
         &self,
-        _ctx: &mut Context,
+        _context: &mut Context,
         configuration: &Option<Configuration>,
         mut inputs: Inputs,
-    ) -> Result<Option<Box<dyn AsyncIteration>>> {
-        let interval = match configuration {
-            Some(conf) => conf["interval"].as_f64().unwrap(),
-            None => 1.0f64,
-        };
-
+    ) -> Result<Option<Arc<dyn Node>>> {
         let pipeline = match configuration {
             Some(conf) => conf["pipeline"].as_u64().unwrap(),
-            None => 1u64,
+            None => 1,
         };
 
-        let msgs = match configuration {
+        let messages = match configuration {
             Some(conf) => conf["msgs"].as_u64().unwrap(),
-            None => 1u64,
+            None => 1,
         };
 
-        let state = LatSinkState {
-            _interval: interval,
+        let input = inputs.take(LAT_PORT).unwrap();
+
+        Ok(Some(Arc::new(LatSink {
+            input,
             pipeline,
-            msgs,
-        };
-
-        let input = inputs.take_into_arc(LAT_PORT).unwrap();
-
-        Ok(Some(Box::new(move || {
-            let c_input = input.clone();
-            let c_state = state.clone();
-
-            async move {
-                if let Ok(Message::Data(mut msg)) = c_input.recv_async().await {
-                    let data = msg.get_inner_data().try_get::<Latency>()?;
-                    let now = get_epoch_us();
-
-                    let elapsed = now - data.ts;
-                    let msgs = c_state.msgs;
-                    let pipeline = c_state.pipeline;
-                    println!("zenoh-flow,single,latency,{pipeline},8,{msgs},{elapsed},us");
-                }
-                Ok(())
-            }
+            messages,
         })))
     }
 }
 
-// Pong SINK
-
-pub struct PongSink;
+/*
+ ***************************************************************************************************
+ *
+ * PONG SINK
+ *
+ ***************************************************************************************************
+ */
 
 #[derive(Debug, Clone)]
-struct PongSinkState<'a> {
+struct PongSinkState {
     pipeline: u64,
     _interval: f64,
     msgs: u64,
     session: Arc<zenoh::Session>,
-    expr: KeyExpr<'a>,
+    expr: KeyExpr<'static>,
     data: Vec<u8>,
     layer: String,
 }
 
+pub struct PongSink {
+    input: Input,
+    state: PongSinkState,
+}
+
 #[async_trait]
-impl Sink for PongSink {
-    async fn setup(
+impl Node for PongSink {
+    async fn iteration(&self) -> Result<()> {
+        if let Ok(Message::Data(mut msg)) = self.input.recv_async().await {
+            let data = msg.get_inner_data().try_get::<Latency>()?;
+            let now = get_epoch_us();
+
+            let elapsed = now - data.ts;
+            let msgs = &self.state.msgs;
+            let pipeline = &self.state.pipeline;
+            let layer = &self.state.layer;
+            println!("zenoh-flow,{layer},latency,{pipeline},8,{msgs},{elapsed},us");
+
+            self.state
+                .session
+                .put(&self.state.expr, self.state.data.clone())
+                .congestion_control(CongestionControl::Block)
+                .res()
+                .await?;
+        }
+        Ok(())
+    }
+}
+
+pub struct PongSinkFactory;
+
+#[async_trait]
+impl SinkFactoryTrait for PongSinkFactory {
+    async fn new_sink(
         &self,
         _ctx: &mut Context,
         configuration: &Option<Configuration>,
         mut inputs: Inputs,
-    ) -> Result<Option<Box<dyn AsyncIteration>>> {
+    ) -> Result<Option<Arc<dyn Node>>> {
         let interval = match configuration {
             Some(conf) => conf["interval"].as_f64().unwrap(),
             None => 1.0f64,
@@ -155,55 +190,51 @@ impl Sink for PongSink {
             layer,
         };
 
-        let input = inputs.take_into_arc(LAT_PORT).unwrap();
-
-        Ok(Some(Box::new(move || {
-            let c_input = input.clone();
-            let c_state = state.clone();
-
-            async move {
-                if let Ok(Message::Data(mut msg)) = c_input.recv_async().await {
-                    let data = msg.get_inner_data().try_get::<Latency>()?;
-                    let now = get_epoch_us();
-
-                    let elapsed = now - data.ts;
-                    let msgs = c_state.msgs;
-                    let pipeline = c_state.pipeline;
-                    let layer = c_state.layer;
-                    println!("zenoh-flow,{layer},latency,{pipeline},8,{msgs},{elapsed},us");
-
-                    c_state
-                        .session
-                        .put(&c_state.expr, c_state.data.clone())
-                        .congestion_control(CongestionControl::Block)
-                        .res()
-                        .await?;
-                }
-                Ok(())
-            }
-        })))
+        let input = inputs.take(LAT_PORT).unwrap();
+        Ok(Some(Arc::new(PongSink { input, state })))
     }
 }
 
-// THR SINK
+/*
+ ***************************************************************************************************
+ *
+ * THROUGHPUT SINK
+ *
+ ***************************************************************************************************
+ */
 
-pub struct ThrSink;
+pub struct ThrSink {
+    input: Input,
+    state: Arc<ThrSinkState>,
+}
+
+#[async_trait]
+impl Node for ThrSink {
+    async fn iteration(&self) -> Result<()> {
+        if let Ok(Message::Data(_)) = self.input.recv_async().await {
+            self.state.accumulator.fetch_add(1, Ordering::Relaxed);
+        }
+        Ok(())
+    }
+}
 
 #[derive(Debug, Clone)]
-struct SinkState {
+struct ThrSinkState {
     pub _payload_size: usize,
     pub accumulator: Arc<AtomicUsize>,
     pub _abort_handle: AbortHandle,
 }
 
+pub struct ThrSinkFactory;
+
 #[async_trait]
-impl Sink for ThrSink {
-    async fn setup(
+impl SinkFactoryTrait for ThrSinkFactory {
+    async fn new_sink(
         &self,
         _ctx: &mut Context,
         configuration: &Option<Configuration>,
         mut inputs: Inputs,
-    ) -> Result<Option<Box<dyn AsyncIteration>>> {
+    ) -> Result<Option<Arc<dyn Node>>> {
         let payload_size = match configuration {
             Some(conf) => conf["payload_size"].as_u64().unwrap() as usize,
             None => 8usize,
@@ -250,52 +281,82 @@ impl Sink for ThrSink {
         let (abort_handle, abort_registration) = AbortHandle::new_pair();
         let _print_task = async_std::task::spawn(Abortable::new(print_loop, abort_registration));
 
-        let state = Arc::new(SinkState {
+        let state = Arc::new(ThrSinkState {
             _payload_size: payload_size,
             accumulator,
             _abort_handle: abort_handle,
         });
 
-        let input = inputs.take_into_arc(THR_PORT).unwrap();
+        let input = inputs.take(THR_PORT).unwrap();
 
-        Ok(Some(Box::new(move || {
-            let c_input = input.clone();
-            let c_state = state.clone();
-            async move {
-                if let Ok(Message::Data(_)) = c_input.recv_async().await {
-                    c_state.accumulator.fetch_add(1, Ordering::Relaxed);
-                }
-                Ok(())
-            }
-        })))
+        Ok(Some(Arc::new(ThrSink { input, state })))
     }
 }
 
-// PONG SINK SCALABILITY
+/*
+ ***************************************************************************************************
+ *
+ * PONG SINK SCALABILITY
+ *
+ ***************************************************************************************************
+ */
 
-pub struct ScalPongSink;
+pub struct ScalPongSink {
+    input: Input,
+    state: Arc<ScalPongSinkState>,
+}
 
 #[derive(Debug, Clone)]
-struct ScalPongSinkState<'a> {
+struct ScalPongSinkState {
     nodes: u64,
     _interval: f64,
     msgs: u64,
     session: Arc<zenoh::Session>,
-    expr: KeyExpr<'a>,
+    expr: KeyExpr<'static>,
     data: Vec<u8>,
     diff: bool,
     layer: String,
 }
 
 #[async_trait]
-impl Sink for ScalPongSink {
-    async fn setup(
+impl Node for ScalPongSink {
+    async fn iteration(&self) -> Result<()> {
+        if let Ok(Message::Data(mut msg)) = self.input.recv_async().await {
+            let data = msg.get_inner_data().try_get::<Latency>()?;
+            let now = get_epoch_us();
+
+            let elapsed = match self.state.diff {
+                true => now - data.ts,
+                false => data.ts,
+            };
+            let msgs = self.state.msgs;
+            let pipeline = self.state.nodes;
+            let layer = &self.state.layer;
+            println!("zenoh-flow,{layer},latency,{pipeline},8,{msgs},{elapsed},us");
+
+            self.state
+                .session
+                .put(&self.state.expr, self.state.data.clone())
+                .congestion_control(CongestionControl::Block)
+                .res()
+                .await?;
+        }
+        Ok(())
+    }
+}
+
+pub struct ScalPongSinkFactory {
+    pub locator_tcp_port: usize,
+}
+
+#[async_trait]
+impl SinkFactoryTrait for ScalPongSinkFactory {
+    async fn new_sink(
         &self,
         _ctx: &mut Context,
         configuration: &Option<Configuration>,
         mut inputs: Inputs,
-    ) -> Result<Option<Box<dyn AsyncIteration>>> {
-        // let mut rng = rand::thread_rng();
+    ) -> Result<Option<Arc<dyn Node>>> {
         let interval = match configuration {
             Some(conf) => conf["interval"].as_f64().unwrap(),
             None => 1.0f64,
@@ -338,8 +399,7 @@ impl Sink for ScalPongSink {
             .set_mode(Some(zenoh::config::whatami::WhatAmI::Peer))
             .unwrap();
 
-        // let locator = format!("tcp/127.0.0.1:{}", rng.gen_range(8000..65000));
-        let locator = "tcp/127.0.0.1:49847";
+        let locator = format!("tcp/127.0.0.1:{}", self.locator_tcp_port);
         config
             .listen
             .set_endpoints(vec![locator.parse().unwrap()])
@@ -363,35 +423,8 @@ impl Sink for ScalPongSink {
             layer,
         });
 
-        let input = inputs.take_into_arc(LAT_PORT).unwrap();
+        let input = inputs.take(LAT_PORT).unwrap();
 
-        Ok(Some(Box::new(move || {
-            let c_input = input.clone();
-            let c_state = state.clone();
-
-            async move {
-                if let Ok(Message::Data(mut msg)) = c_input.recv_async().await {
-                    let data = msg.get_inner_data().try_get::<Latency>()?;
-                    let now = get_epoch_us();
-
-                    let elapsed = match c_state.diff {
-                        true => now - data.ts,
-                        false => data.ts,
-                    };
-                    let msgs = c_state.msgs;
-                    let pipeline = c_state.nodes;
-                    let layer = &c_state.layer;
-                    println!("zenoh-flow,{layer},latency,{pipeline},8,{msgs},{elapsed},us");
-
-                    c_state
-                        .session
-                        .put(&c_state.expr, c_state.data.clone())
-                        .congestion_control(CongestionControl::Block)
-                        .res()
-                        .await?;
-                }
-                Ok(())
-            }
-        })))
+        Ok(Some(Arc::new(ScalPongSink { input, state })))
     }
 }

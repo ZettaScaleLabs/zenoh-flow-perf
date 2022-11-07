@@ -40,9 +40,6 @@ impl ZFData for ThrData {
             .map_err(|e| zferror!(ErrorKind::SerializationError, "{}", e))?
             .to_vec())
     }
-}
-
-impl Deserializable for ThrData {
     fn try_deserialize(bytes: &[u8]) -> Result<ThrData>
     where
         Self: Sized,
@@ -64,9 +61,7 @@ impl ZFData for LatData {
             .map_err(|e| zferror!(ErrorKind::SerializationError, "{}", e))?
             .to_vec())
     }
-}
 
-impl Deserializable for LatData {
     fn try_deserialize(bytes: &[u8]) -> Result<LatData>
     where
         Self: Sized,
@@ -75,6 +70,7 @@ impl Deserializable for LatData {
             .map_err(|e| zferror!(ErrorKind::DeseralizationError, "{}", e).into())
     }
 }
+
 
 pub fn get_epoch_us() -> u128 {
     SystemTime::now()
@@ -94,9 +90,7 @@ impl ZFData for Latency {
             .map_err(|e| zferror!(ErrorKind::SerializationError, "{}", e))?
             .to_vec())
     }
-}
 
-impl Deserializable for Latency {
     fn try_deserialize(bytes: &[u8]) -> Result<Latency>
     where
         Self: Sized,
@@ -105,6 +99,7 @@ impl Deserializable for Latency {
             .map_err(|e| zferror!(ErrorKind::DeseralizationError, "{}", e).into())
     }
 }
+
 
 #[derive(Debug, Clone, ZFData, Serialize, Deserialize)]
 pub struct CriterionData {
@@ -117,9 +112,7 @@ impl ZFData for CriterionData {
             .map_err(|e| zferror!(ErrorKind::SerializationError, "{}", e))?
             .to_vec())
     }
-}
 
-impl Deserializable for CriterionData {
     fn try_deserialize(bytes: &[u8]) -> Result<CriterionData>
     where
         Self: Sized,
@@ -128,3 +121,4 @@ impl Deserializable for CriterionData {
             .map_err(|e| zferror!(ErrorKind::DeseralizationError, "{}", e).into())
     }
 }
+

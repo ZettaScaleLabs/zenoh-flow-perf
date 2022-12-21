@@ -45,7 +45,7 @@ impl ZFData for ThrData {
         Self: Sized,
     {
         bincode::deserialize::<ThrData>(bytes)
-            .map_err(|e| zferror!(ErrorKind::DeseralizationError, "{}", e).into())
+            .map_err(|e| zferror!(ErrorKind::DeserializationError, "{}", e).into())
     }
 }
 
@@ -67,10 +67,9 @@ impl ZFData for LatData {
         Self: Sized,
     {
         bincode::deserialize::<LatData>(bytes)
-            .map_err(|e| zferror!(ErrorKind::DeseralizationError, "{}", e).into())
+            .map_err(|e| zferror!(ErrorKind::DeserializationError, "{}", e).into())
     }
 }
-
 
 pub fn get_epoch_us() -> u128 {
     SystemTime::now()
@@ -96,10 +95,9 @@ impl ZFData for Latency {
         Self: Sized,
     {
         bincode::deserialize::<Latency>(bytes)
-            .map_err(|e| zferror!(ErrorKind::DeseralizationError, "{}", e).into())
+            .map_err(|e| zferror!(ErrorKind::DeserializationError, "{}", e).into())
     }
 }
-
 
 #[derive(Debug, Clone, ZFData, Serialize, Deserialize)]
 pub struct CriterionData {
@@ -118,7 +116,6 @@ impl ZFData for CriterionData {
         Self: Sized,
     {
         bincode::deserialize::<CriterionData>(bytes)
-            .map_err(|e| zferror!(ErrorKind::DeseralizationError, "{}", e).into())
+            .map_err(|e| zferror!(ErrorKind::DeserializationError, "{}", e).into())
     }
 }
-

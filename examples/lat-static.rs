@@ -17,10 +17,11 @@ use std::sync::Arc;
 use zenoh::prelude::r#async::*;
 use zenoh_flow::model::descriptor::{InputDescriptor, OutputDescriptor};
 use zenoh_flow::model::record::{OperatorRecord, PortRecord, SinkRecord, SourceRecord};
+use zenoh_flow::prelude::*;
 use zenoh_flow::runtime::dataflow::instance::DataFlowInstance;
 use zenoh_flow::runtime::dataflow::loader::{Loader, LoaderConfig};
 use zenoh_flow::runtime::RuntimeContext;
-use zenoh_flow_perf::nodes::{LatSinkFactory, LatSourceFactory, NoOpFactory, LAT_PORT};
+use zenoh_flow_perf::nodes::{LatSink, LatSource, NoOp, LAT_PORT};
 
 static DEFAULT_PIPELINE: &str = "1";
 static DEFAULT_MSGS: &str = "1";
@@ -81,7 +82,15 @@ async fn main() {
         runtime: runtime_name.clone(),
     };
 
-    zf_graph.add_source_factory(source_record, Arc::new(LatSourceFactory));
+    zf_graph.add_source(
+        source_record,
+        |context: Context, configuration: Option<Configuration>, outputs: Outputs| {
+            Box::pin(async {
+                let node = LatSource::new(context, configuration, outputs).await?;
+                Ok(Arc::new(node) as Arc<dyn Node>)
+            })
+        },
+    );
 
     /*
      * Sink
@@ -99,7 +108,15 @@ async fn main() {
         runtime: runtime_name.clone(),
     };
 
-    zf_graph.add_sink_factory(sink_record, Arc::new(LatSinkFactory));
+    zf_graph.add_sink(
+        sink_record,
+        |context: Context, configuration: Option<Configuration>, inputs: Inputs| {
+            Box::pin(async {
+                let node = LatSink::new(context, configuration, inputs).await?;
+                Ok(Arc::new(node) as Arc<dyn Node>)
+            })
+        },
+    );
 
     /*
      * Operators
@@ -125,7 +142,18 @@ async fn main() {
             runtime: runtime_name.clone(),
         };
 
-        zf_graph.add_operator_factory(operator_record, Arc::new(NoOpFactory));
+        zf_graph.add_operator(
+            operator_record,
+            |context: Context,
+             configuration: Option<Configuration>,
+             inputs: Inputs,
+             outputs: Outputs| {
+                Box::pin(async {
+                    let node = NoOp::new(context, configuration, inputs, outputs).await?;
+                    Ok(Arc::new(node) as Arc<dyn Node>)
+                })
+            },
+        );
     }
 
     /*

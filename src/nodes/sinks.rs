@@ -33,7 +33,7 @@ use super::{LAT_PORT, THR_PORT};
  */
 
 pub struct LatSink {
-    input: Input,
+    input: Input<Latency>,
     pipeline: u64,
     messages: u64,
 }
@@ -41,10 +41,9 @@ pub struct LatSink {
 #[async_trait::async_trait]
 impl Node for LatSink {
     async fn iteration(&self) -> Result<()> {
-        if let Ok(Message::Data(mut message)) = self.input.recv_async().await {
-            let data = message.get_inner_data().try_get::<Latency>()?;
+        if let Ok((Message::Data(data), _)) = self.input.recv().await {
             let now = get_epoch_us();
-            let elapsed = now - data.ts;
+            let elapsed = now - (*data).ts;
             println!(
                 "zenoh-flow,single,latency,{},8,{},{elapsed},us",
                 self.pipeline, self.messages
@@ -55,33 +54,30 @@ impl Node for LatSink {
     }
 }
 
-pub struct LatSinkFactory;
-
 #[async_trait::async_trait]
-impl SinkFactoryTrait for LatSinkFactory {
-    async fn new_sink(
-        &self,
-        _context: &mut Context,
-        configuration: &Option<Configuration>,
+impl Sink for LatSink {
+    async fn new(
+        _context: Context,
+        configuration: Option<Configuration>,
         mut inputs: Inputs,
-    ) -> Result<Option<Arc<dyn Node>>> {
-        let pipeline = match configuration {
+    ) -> Result<Self> {
+        let pipeline = match &configuration {
             Some(conf) => conf["pipeline"].as_u64().unwrap(),
             None => 1,
         };
 
-        let messages = match configuration {
+        let messages = match &configuration {
             Some(conf) => conf["msgs"].as_u64().unwrap(),
             None => 1,
         };
 
         let input = inputs.take(LAT_PORT).unwrap();
 
-        Ok(Some(Arc::new(LatSink {
+        Ok(LatSink {
             input,
             pipeline,
             messages,
-        })))
+        })
     }
 }
 
@@ -105,18 +101,17 @@ struct PongSinkState {
 }
 
 pub struct PongSink {
-    input: Input,
+    input: Input<Latency>,
     state: PongSinkState,
 }
 
 #[async_trait]
 impl Node for PongSink {
     async fn iteration(&self) -> Result<()> {
-        if let Ok(Message::Data(mut msg)) = self.input.recv_async().await {
-            let data = msg.get_inner_data().try_get::<Latency>()?;
+        if let Ok((Message::Data(data), _)) = self.input.recv().await {
             let now = get_epoch_us();
 
-            let elapsed = now - data.ts;
+            let elapsed = now - (*data).ts;
             let msgs = &self.state.msgs;
             let pipeline = &self.state.pipeline;
             let layer = &self.state.layer;
@@ -133,32 +128,29 @@ impl Node for PongSink {
     }
 }
 
-pub struct PongSinkFactory;
-
 #[async_trait]
-impl SinkFactoryTrait for PongSinkFactory {
-    async fn new_sink(
-        &self,
-        _ctx: &mut Context,
-        configuration: &Option<Configuration>,
+impl Sink for PongSink {
+    async fn new(
+        _ctx: Context,
+        configuration: Option<Configuration>,
         mut inputs: Inputs,
-    ) -> Result<Option<Arc<dyn Node>>> {
-        let interval = match configuration {
+    ) -> Result<Self> {
+        let interval = match &configuration {
             Some(conf) => conf["interval"].as_f64().unwrap(),
             None => 1.0f64,
         };
 
-        let pipeline = match configuration {
+        let pipeline = match &configuration {
             Some(conf) => conf["pipeline"].as_u64().unwrap(),
             None => 1u64,
         };
 
-        let msgs = match configuration {
+        let msgs = match &configuration {
             Some(conf) => conf["msgs"].as_u64().unwrap(),
             None => 1u64,
         };
 
-        let multi = match configuration {
+        let multi = match &configuration {
             Some(conf) => conf["multi"].as_bool().unwrap(),
             None => false,
         };
@@ -191,7 +183,7 @@ impl SinkFactoryTrait for PongSinkFactory {
         };
 
         let input = inputs.take(LAT_PORT).unwrap();
-        Ok(Some(Arc::new(PongSink { input, state })))
+        Ok(PongSink { input, state })
     }
 }
 
@@ -203,21 +195,6 @@ impl SinkFactoryTrait for PongSinkFactory {
  ***************************************************************************************************
  */
 
-pub struct ThrSink {
-    input: Input,
-    state: Arc<ThrSinkState>,
-}
-
-#[async_trait]
-impl Node for ThrSink {
-    async fn iteration(&self) -> Result<()> {
-        if let Ok(Message::Data(_)) = self.input.recv_async().await {
-            self.state.accumulator.fetch_add(1, Ordering::Relaxed);
-        }
-        Ok(())
-    }
-}
-
 #[derive(Debug, Clone)]
 struct ThrSinkState {
     pub _payload_size: usize,
@@ -225,22 +202,34 @@ struct ThrSinkState {
     pub _abort_handle: AbortHandle,
 }
 
-pub struct ThrSinkFactory;
+pub struct ThrSink {
+    input: InputRaw,
+    state: Arc<ThrSinkState>,
+}
 
 #[async_trait]
-impl SinkFactoryTrait for ThrSinkFactory {
-    async fn new_sink(
-        &self,
-        _ctx: &mut Context,
-        configuration: &Option<Configuration>,
+impl Node for ThrSink {
+    async fn iteration(&self) -> Result<()> {
+        if let Ok(_link_message) = self.input.recv().await {
+            self.state.accumulator.fetch_add(1, Ordering::Relaxed);
+        }
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl Sink for ThrSink {
+    async fn new(
+        _ctx: Context,
+        configuration: Option<Configuration>,
         mut inputs: Inputs,
-    ) -> Result<Option<Arc<dyn Node>>> {
-        let payload_size = match configuration {
+    ) -> Result<Self> {
+        let payload_size = match &configuration {
             Some(conf) => conf["payload_size"].as_u64().unwrap() as usize,
             None => 8usize,
         };
 
-        let multi = match configuration {
+        let multi = match &configuration {
             Some(conf) => conf["multi"].as_bool().unwrap(),
             None => false,
         };
@@ -287,9 +276,9 @@ impl SinkFactoryTrait for ThrSinkFactory {
             _abort_handle: abort_handle,
         });
 
-        let input = inputs.take(THR_PORT).unwrap();
+        let input = inputs.take_raw(THR_PORT).unwrap();
 
-        Ok(Some(Arc::new(ThrSink { input, state })))
+        Ok(ThrSink { input, state })
     }
 }
 
@@ -300,11 +289,6 @@ impl SinkFactoryTrait for ThrSinkFactory {
  *
  ***************************************************************************************************
  */
-
-pub struct ScalPongSink {
-    input: Input,
-    state: Arc<ScalPongSinkState>,
-}
 
 #[derive(Debug, Clone)]
 struct ScalPongSinkState {
@@ -318,16 +302,20 @@ struct ScalPongSinkState {
     layer: String,
 }
 
+pub struct ScalPongSink {
+    input: Input<Latency>,
+    state: Arc<ScalPongSinkState>,
+}
+
 #[async_trait]
 impl Node for ScalPongSink {
     async fn iteration(&self) -> Result<()> {
-        if let Ok(Message::Data(mut msg)) = self.input.recv_async().await {
-            let data = msg.get_inner_data().try_get::<Latency>()?;
+        if let Ok((Message::Data(data), _)) = self.input.recv().await {
             let now = get_epoch_us();
 
             let elapsed = match self.state.diff {
-                true => now - data.ts,
-                false => data.ts,
+                true => now - (*data).ts,
+                false => (*data).ts,
             };
             let msgs = self.state.msgs;
             let pipeline = self.state.nodes;
@@ -345,46 +333,46 @@ impl Node for ScalPongSink {
     }
 }
 
-pub struct ScalPongSinkFactory {
-    pub locator_tcp_port: usize,
-}
-
 #[async_trait]
-impl SinkFactoryTrait for ScalPongSinkFactory {
-    async fn new_sink(
-        &self,
-        _ctx: &mut Context,
-        configuration: &Option<Configuration>,
+impl Sink for ScalPongSink {
+    async fn new(
+        _ctx: Context,
+        configuration: Option<Configuration>,
         mut inputs: Inputs,
-    ) -> Result<Option<Arc<dyn Node>>> {
-        let interval = match configuration {
+    ) -> Result<Self> {
+        let interval = match &configuration {
             Some(conf) => conf["interval"].as_f64().unwrap(),
             None => 1.0f64,
         };
 
-        let nodes = match configuration {
+        let nodes = match &configuration {
             Some(conf) => conf["nodes"].as_u64().unwrap(),
             None => 1u64,
         };
 
-        let msgs = match configuration {
+        let msgs = match &configuration {
             Some(conf) => conf["msgs"].as_u64().unwrap(),
             None => 1u64,
         };
 
-        let node_id = match configuration {
+        let node_id = match &configuration {
             Some(conf) => conf["id"].as_u64().unwrap(),
             None => 0u64,
         };
 
-        let mode = match configuration {
+        let mode = match &configuration {
             Some(conf) => conf["mode"].as_u64().unwrap(),
             None => 1u64,
         };
 
-        let multi = match configuration {
+        let multi = match &configuration {
             Some(conf) => conf["multi"].as_bool().unwrap(),
             None => false,
+        };
+
+        let locator_tcp_port = match &configuration {
+            Some(conf) => conf["locator_tcp_port"].as_u64().unwrap(),
+            None => 8448,
         };
 
         let layer = match multi {
@@ -399,7 +387,7 @@ impl SinkFactoryTrait for ScalPongSinkFactory {
             .set_mode(Some(zenoh::config::whatami::WhatAmI::Peer))
             .unwrap();
 
-        let locator = format!("tcp/127.0.0.1:{}", self.locator_tcp_port);
+        let locator = format!("tcp/127.0.0.1:{}", locator_tcp_port);
         config
             .listen
             .set_endpoints(vec![locator.parse().unwrap()])
@@ -425,6 +413,6 @@ impl SinkFactoryTrait for ScalPongSinkFactory {
 
         let input = inputs.take(LAT_PORT).unwrap();
 
-        Ok(Some(Arc::new(ScalPongSink { input, state })))
+        Ok(ScalPongSink { input, state })
     }
 }

@@ -27,39 +27,29 @@ use zenoh_flow::prelude::*;
  */
 
 pub struct NoOp {
-    input: Input,
-    output: Output,
+    input: InputRaw,
+    output: OutputRaw,
 }
 
 #[async_trait::async_trait]
 impl Node for NoOp {
     async fn iteration(&self) -> Result<()> {
-        if let Ok(Message::Data(mut message)) = self.input.recv_async().await {
-            self.output
-                .send_async(message.get_inner_data().clone(), None)
-                .await
-                .unwrap();
-        }
-
-        Ok(())
+        self.output.forward(self.input.recv().await?).await
     }
 }
 
-pub struct NoOpFactory;
-
 #[async_trait::async_trait]
-impl OperatorFactoryTrait for NoOpFactory {
-    async fn new_operator(
-        &self,
-        _context: &mut Context,
-        _configuration: &Option<Configuration>,
+impl Operator for NoOp {
+    async fn new(
+        _context: Context,
+        _configuration: Option<Configuration>,
         mut inputs: Inputs,
         mut outputs: Outputs,
-    ) -> Result<Option<Arc<dyn Node>>> {
-        Ok(Some(Arc::new(NoOp {
-            input: inputs.take(LAT_PORT).unwrap(),
-            output: outputs.take(LAT_PORT).unwrap(),
-        })))
+    ) -> Result<Self> {
+        Ok(Self {
+            input: inputs.take_raw(LAT_PORT).unwrap(),
+            output: outputs.take_raw(LAT_PORT).unwrap(),
+        })
     }
 }
 
@@ -81,18 +71,17 @@ struct LatOpState {
 
 #[derive(Debug)]
 pub struct NoOpPrint {
-    input: Input,
+    input: Input<Latency>,
     state: Arc<LatOpState>,
 }
 
 #[async_trait]
 impl Node for NoOpPrint {
     async fn iteration(&self) -> Result<()> {
-        if let Ok(Message::Data(mut msg)) = self.input.recv_async().await {
-            let data = msg.get_inner_data().try_get::<Latency>()?;
+        if let Ok((Message::Data(msg), _)) = self.input.recv().await {
             let now = get_epoch_us();
 
-            let elapsed = now - data.ts;
+            let elapsed = now - (*msg).ts;
             let msgs = self.state.msgs;
             let pipeline = self.state.pipeline;
             let layer = &self.state.layer;
@@ -105,30 +94,29 @@ impl Node for NoOpPrint {
 pub struct NoOpPrintFactory;
 
 #[async_trait]
-impl OperatorFactoryTrait for NoOpPrintFactory {
-    async fn new_operator(
-        &self,
-        _ctx: &mut Context,
-        configuration: &Option<Configuration>,
+impl Operator for NoOpPrint {
+    async fn new(
+        _ctx: Context,
+        configuration: Option<Configuration>,
         mut inputs: Inputs,
         mut _outputs: Outputs,
-    ) -> Result<Option<Arc<dyn Node>>> {
-        let interval = match configuration {
+    ) -> Result<Self> {
+        let interval = match &configuration {
             Some(conf) => conf["interval"].as_f64().unwrap(),
             None => 1.0f64,
         };
 
-        let pipeline = match configuration {
+        let pipeline = match &configuration {
             Some(conf) => conf["pipeline"].as_u64().unwrap(),
             None => 1u64,
         };
 
-        let msgs = match configuration {
+        let msgs = match &configuration {
             Some(conf) => conf["msgs"].as_u64().unwrap(),
             None => 1u64,
         };
 
-        let multi = match configuration {
+        let multi = match &configuration {
             Some(conf) => conf["multi"].as_bool().unwrap(),
             None => false,
         };
@@ -147,7 +135,7 @@ impl OperatorFactoryTrait for NoOpPrintFactory {
 
         let input = inputs.take(LAT_PORT).unwrap();
 
-        Ok(Some(Arc::new(NoOpPrint { state, input })))
+        Ok(Self { state, input })
     }
 }
 
@@ -160,38 +148,29 @@ impl OperatorFactoryTrait for NoOpPrintFactory {
  */
 
 pub struct ThrNoOp {
-    input: Input,
-    output: Output,
+    input: InputRaw,
+    output: OutputRaw,
 }
 
 #[async_trait]
 impl Node for ThrNoOp {
     async fn iteration(&self) -> Result<()> {
-        if let Ok(Message::Data(mut msg)) = self.input.recv_async().await {
-            self.output
-                .send_async(msg.get_inner_data().clone(), None)
-                .await
-                .unwrap();
-        }
-        Ok(())
+        self.output.forward(self.input.recv().await?).await
     }
 }
 
-pub struct ThrNoOpFactory;
-
 #[async_trait]
-impl OperatorFactoryTrait for ThrNoOpFactory {
-    async fn new_operator(
-        &self,
-        _ctx: &mut Context,
-        _configuration: &Option<Configuration>,
+impl Operator for ThrNoOp {
+    async fn new(
+        _ctx: Context,
+        _configuration: Option<Configuration>,
         mut inputs: Inputs,
         mut outputs: Outputs,
-    ) -> Result<Option<Arc<dyn Node>>> {
-        let input = inputs.take(THR_PORT).unwrap();
-        let output = outputs.take(THR_PORT).unwrap();
+    ) -> Result<Self> {
+        let input = inputs.take_raw(THR_PORT).unwrap();
+        let output = outputs.take_raw(THR_PORT).unwrap();
 
-        Ok(Some(Arc::new(ThrNoOp { input, output })))
+        Ok(Self { input, output })
     }
 }
 
@@ -204,14 +183,14 @@ impl OperatorFactoryTrait for ThrNoOpFactory {
  */
 
 pub struct ScalNoOp {
-    inputs: Vec<Input>,
-    output: Output,
+    inputs: Vec<Input<Latency>>,
+    output: Output<Latency>,
 }
 
 #[async_trait]
 impl Node for ScalNoOp {
     async fn iteration(&self) -> Result<()> {
-        let fut_inputs: Vec<_> = self.inputs.iter().map(|input| input.recv_async()).collect();
+        let fut_inputs: Vec<_> = self.inputs.iter().map(|input| input.recv()).collect();
         let data = futures::future::try_join_all(fut_inputs)
             .await?
             // Get the first one from the list --- we know it’s the first one because `try_join_all`
@@ -220,33 +199,25 @@ impl Node for ScalNoOp {
             .expect("ScalNoOp received no data");
 
         match data {
-            Message::Data(mut d) => {
-                let latency = d.get_inner_data().try_get::<Latency>()?;
+            (Message::Data(latency), _) => {
                 let now = get_epoch_us();
-                let elapsed = now - latency.ts;
-
-                let data_to_send = Data::from(Latency { ts: elapsed });
-
-                self.output.send_async(data_to_send, None).await
+                let elapsed = now - (*latency).ts;
+                self.output.send(Latency { ts: elapsed }, None).await
             }
-            Message::Watermark(_) => panic!("Watermark message unsupported"),
             _ => panic!("Unimplemented"),
         }
     }
 }
 
-pub struct ScalNoOpFactory;
-
 #[async_trait]
-impl OperatorFactoryTrait for ScalNoOpFactory {
-    async fn new_operator(
-        &self,
-        _ctx: &mut Context,
-        configuration: &Option<Configuration>,
+impl Operator for ScalNoOp {
+    async fn new(
+        _ctx: Context,
+        configuration: Option<Configuration>,
         mut inputs: Inputs,
         mut outputs: Outputs,
-    ) -> Result<Option<Arc<dyn Node>>> {
-        let ins: Vec<Input> = match configuration {
+    ) -> Result<Self> {
+        let ins: Vec<Input<Latency>> = match &configuration {
             Some(configuration) => {
                 let port_ids = configuration["port_ids"]
                     .as_array()
@@ -265,11 +236,11 @@ impl OperatorFactoryTrait for ScalNoOpFactory {
             None => panic!("The port_ids of the inputs must be specified for this operator"),
         };
 
-        Ok(Some(Arc::new(ScalNoOp {
+        Ok(ScalNoOp {
             inputs: ins,
             output: outputs
                 .take(LAT_PORT)
                 .expect("Output LAT_PORT should exist"),
-        })))
+        })
     }
 }

@@ -1,6 +1,6 @@
 [package]
 name = "zenoh-flow-perf"
-version = "0.4.0"
+version = "0.5.0-dev"
 repository = "https://github.com/eclipse-zenoh/zenoh-flow"
 homepage = "http://zenoh.io"
 authors = ["kydos <angelo@icorsaro.net>",
@@ -26,7 +26,7 @@ serde_json = "1.0.78"
 uhlc = "0.5"
 uuid = { version = "1.1", features = ["serde", "v4"] }
 zenoh = { version = "=0.7.0-rc" }
-zenoh-flow = { version = "=0.4.0-alpha.1" }
+zenoh-flow = { version = "0.5.0-dev" }
 
 [dev-dependencies]
 async-ctrlc ={version = "1.2.0", features = ["stream"]}
@@ -92,3 +92,7 @@ lto="fat"
 codegen-units=1
 opt-level=3
 panic="abort"
+
+
+[patch.crates-io]
+zenoh-flow = { git = "https://github.com/eclipse-zenoh/zenoh-flow.git", branch = "master"}

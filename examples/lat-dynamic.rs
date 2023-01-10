@@ -15,11 +15,12 @@
 use std::collections::HashMap;
 
 use clap::Parser;
-use zenoh_flow::model::dataflow::descriptor::DataFlowDescriptor;
-use zenoh_flow::model::link::{LinkDescriptor, PortDescriptor};
-use zenoh_flow::model::node::{OperatorDescriptor, SinkDescriptor, SourceDescriptor};
-use zenoh_flow::model::{InputDescriptor, OutputDescriptor};
-use zenoh_flow::{NodeId, RuntimeId};
+use zenoh_flow::model::descriptor::{
+    FlattenDataFlowDescriptor, InputDescriptor, LinkDescriptor, OperatorDescriptor,
+    OutputDescriptor, PortDescriptor, SinkDescriptor, SourceDescriptor,
+};
+use zenoh_flow::types::{NodeId, RuntimeId};
+use zenoh_flow_perf::runtime::Descriptor;
 
 static DEFAULT_PIPELINE: &str = "1";
 static DEFAULT_MSGS: &str = "1";
@@ -47,7 +48,7 @@ struct CallArgs {
     name: String,
     #[clap(short, long, default_value = DEFAULT_RT_DESCRIPTOR)]
     descriptor_file: String,
-    #[clap(short, long)]
+    #[clap(long)]
     ping: bool,
     #[clap(short, long)]
     listen: Vec<String>,
@@ -63,7 +64,7 @@ async fn main() {
     if args.runtime {
         zenoh_flow_perf::runtime::runtime(
             args.name,
-            args.descriptor_file.clone(),
+            Descriptor::Flatten(args.descriptor_file.clone()),
             args.listen,
             args.connect,
         )
@@ -79,17 +80,14 @@ async fn main() {
     // Creating the descriptor
 
     let mut mapping: HashMap<NodeId, RuntimeId> = HashMap::new();
-    let mut dfd = DataFlowDescriptor {
+    let mut dfd = FlattenDataFlowDescriptor {
         flow: format!("pipeline{}", args.pipeline),
         operators: vec![],
         sources: vec![],
         sinks: vec![],
         links: vec![],
         mapping: None,
-        deadlines: None,
-        loops: None,
         global_configuration: None,
-        flags: None,
     };
 
     // Source and Sink
@@ -98,48 +96,48 @@ async fn main() {
         true => {
             let src = SourceDescriptor {
                 id: "source".into(),
-                period: None,
-                output: PortDescriptor {
+                // period: None,
+                outputs: vec![PortDescriptor {
                     port_id: PORT.into(),
                     port_type: "latency".into(),
-                },
+                }],
                 uri: Some(String::from(PING_SRC_URI)),
                 configuration: config.clone(),
-                runtime: None,
+                tags: vec![],
             };
             let snk = SinkDescriptor {
                 id: "sink".into(),
-                input: PortDescriptor {
+                inputs: vec![PortDescriptor {
                     port_id: PORT.into(),
                     port_type: "latency".into(),
-                },
+                }],
                 uri: Some(String::from(PONG_SNK_URI)),
                 configuration: config,
-                runtime: None,
+                tags: vec![],
             };
             (src, snk)
         }
         false => {
             let src = SourceDescriptor {
                 id: "source".into(),
-                period: None,
-                output: PortDescriptor {
+                // period: None,
+                outputs: vec![PortDescriptor {
                     port_id: PORT.into(),
                     port_type: "latency".into(),
-                },
+                }],
                 uri: Some(String::from(SRC_URI)),
                 configuration: config.clone(),
-                runtime: None,
+                tags: vec![],
             };
             let snk = SinkDescriptor {
                 id: "sink".into(),
-                input: PortDescriptor {
+                inputs: vec![PortDescriptor {
                     port_id: PORT.into(),
                     port_type: "latency".into(),
-                },
+                }],
                 uri: Some(String::from(SNK_URI)),
                 configuration: config,
-                runtime: None,
+                tags: vec![],
             };
             (src, snk)
         }
@@ -164,8 +162,7 @@ async fn main() {
             }],
             uri: Some(String::from(NOOP_URI)),
             configuration: None,
-            runtime: None,
-            deadline: None,
+            tags: vec![],
         };
         dfd.operators.push(op_descriptor);
     }

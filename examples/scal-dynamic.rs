@@ -16,12 +16,13 @@ use clap::Parser;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::str::FromStr;
-use zenoh_flow::model::dataflow::descriptor::DataFlowDescriptor;
-use zenoh_flow::model::link::{LinkDescriptor, PortDescriptor};
-use zenoh_flow::model::node::{OperatorDescriptor, SinkDescriptor, SourceDescriptor};
-use zenoh_flow::model::{InputDescriptor, OutputDescriptor};
-use zenoh_flow::{NodeId, RuntimeId};
+use zenoh_flow::model::descriptor::{
+    FlattenDataFlowDescriptor, InputDescriptor, LinkDescriptor, OperatorDescriptor,
+    OutputDescriptor, PortDescriptor, SinkDescriptor, SourceDescriptor,
+};
+use zenoh_flow::types::{NodeId, RuntimeId};
 use zenoh_flow_perf::nodes::LAT_PORT;
+use zenoh_flow_perf::runtime::Descriptor;
 static DEFAULT_FACTOR: &str = "0";
 static DEFAULT_FANKIND: &str = "in";
 static DEFAULT_MSGS: &str = "1";
@@ -83,7 +84,7 @@ async fn main() {
     if args.runtime {
         zenoh_flow_perf::runtime::runtime(
             args.name,
-            args.descriptor_file.clone(),
+            Descriptor::Flatten(args.descriptor_file.clone()),
             args.listen,
             args.connect,
         )
@@ -109,31 +110,27 @@ async fn main() {
     }));
 
     let mut mapping: HashMap<NodeId, RuntimeId> = HashMap::new();
-    let mut dfd = DataFlowDescriptor {
+    let mut dfd = FlattenDataFlowDescriptor {
         flow: format!("scaling{}", total_nodes),
         operators: vec![],
         sources: vec![],
         sinks: vec![],
         links: vec![],
         mapping: None,
-        deadlines: None,
-        loops: None,
         global_configuration: None,
-        flags: None,
     };
 
     // Source and Sink
 
     let source_descriptor = SourceDescriptor {
         id: "source".into(),
-        period: None,
-        output: PortDescriptor {
+        outputs: vec![PortDescriptor {
             port_id: LAT_PORT.into(),
             port_type: "latency".into(),
-        },
+        }],
         uri: Some(String::from(PING_SRC_URI)),
         configuration: config.clone(),
-        runtime: None,
+        tags: vec![],
     };
 
     // Adding source and sinks to descriptor
@@ -148,13 +145,13 @@ async fn main() {
             // creating sink
             let sink_descriptor = SinkDescriptor {
                 id: "sink".into(),
-                input: PortDescriptor {
+                inputs: vec![PortDescriptor {
                     port_id: LAT_PORT.into(),
                     port_type: "latency".into(),
-                },
+                }],
                 uri: Some(String::from(PONG_SNK_URI)),
                 configuration: sink_config,
-                runtime: None,
+                tags: vec![],
             };
             dfd.sinks.push(sink_descriptor);
             mapping.insert("sink".into(), "snk".into());
@@ -173,8 +170,7 @@ async fn main() {
                     }],
                     uri: Some(String::from(NOOP_URI)),
                     configuration: None,
-                    runtime: None,
-                    deadline: None,
+                    tags: vec![],
                 };
                 dfd.operators.push(op_descriptor);
             }
@@ -198,9 +194,9 @@ async fn main() {
                 }],
                 uri: Some(String::from(LASTOP_URI)),
                 configuration: None,
-                runtime: None,
-                deadline: None,
+                tags: vec![],
             };
+
             dfd.operators.push(op_descriptor);
             mapping.insert("op-last".into(), "complast".into());
 
@@ -268,8 +264,7 @@ async fn main() {
                     }],
                     uri: Some(String::from(NOOP_URI)),
                     configuration: None,
-                    runtime: None,
-                    deadline: None,
+                    tags: vec![],
                 };
                 dfd.operators.push(op_descriptor);
             }
@@ -283,13 +278,13 @@ async fn main() {
 
                 let sink_descriptor = SinkDescriptor {
                     id: format!("sink-{i}").into(),
-                    input: PortDescriptor {
+                    inputs: vec![PortDescriptor {
                         port_id: LAT_PORT.into(),
                         port_type: "latency".into(),
-                    },
+                    }],
                     uri: Some(String::from(PONG_SNK_URI)),
                     configuration: Some(sink_config),
-                    runtime: None,
+                    tags: vec![],
                 };
 
                 dfd.sinks.push(sink_descriptor);

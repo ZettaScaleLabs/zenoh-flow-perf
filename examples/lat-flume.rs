@@ -12,9 +12,9 @@
 //   ZettaScale zenoh team, <zenoh@zettascale.tech>
 //
 
+use async_std::task;
 use clap::Parser;
 use std::time::Duration;
-use zenoh_flow::async_std::task;
 use zenoh_flow_perf::{get_epoch_us, Latency};
 
 static DEFAULT_PIPELINE: &str = "1";
@@ -57,6 +57,6 @@ async fn main() {
         task::sleep(Duration::from_secs_f64(interval)).await;
         let msg = Latency { ts: get_epoch_us() };
         sender_ping.send_async(msg).await.unwrap();
-        let _ = receiver_pong.recv_async().await.unwrap();
+        receiver_pong.recv_async().await.unwrap();
     }
 }

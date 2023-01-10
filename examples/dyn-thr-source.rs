@@ -12,13 +12,12 @@
 //   ZettaScale zenoh team, <zenoh@zettascale.tech>
 //
 
-use zenoh_flow::async_std::sync::Arc;
-use zenoh_flow::Source;
-use zenoh_flow::{export_source, types::ZFResult};
-use zenoh_flow_perf::nodes::ThrSource;
+use std::sync::Arc;
+use zenoh_flow::prelude::*;
+use zenoh_flow_perf::nodes::ThrSourceFactory;
 
-export_source!(register);
+export_source_factory!(register);
 
-fn register() -> ZFResult<Arc<dyn Source>> {
-    Ok(Arc::new(ThrSource) as Arc<dyn Source>)
+fn register() -> Result<Arc<dyn SourceFactoryTrait>> {
+    Ok(Arc::new(ThrSourceFactory) as Arc<dyn SourceFactoryTrait>)
 }

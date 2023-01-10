@@ -13,13 +13,15 @@
 //
 
 use clap::Parser;
-use zenoh_flow::async_std::sync::Arc;
-use zenoh_flow::model::{InputDescriptor, OutputDescriptor};
-use zenoh_flow::runtime::dataflow::instance::DataflowInstance;
+use std::sync::Arc;
+use zenoh::prelude::r#async::*;
+use zenoh_flow::model::descriptor::{InputDescriptor, OutputDescriptor};
+use zenoh_flow::model::record::{OperatorRecord, PortRecord, SinkRecord, SourceRecord};
+use zenoh_flow::prelude::*;
+use zenoh_flow::runtime::dataflow::instance::DataFlowInstance;
 use zenoh_flow::runtime::dataflow::loader::{Loader, LoaderConfig};
 use zenoh_flow::runtime::RuntimeContext;
-use zenoh_flow::{model::link::PortDescriptor, Node};
-use zenoh_flow_perf::nodes::{ThrNoOp, ThrSink, ThrSource, THR_PORT};
+use zenoh_flow_perf::nodes::{NoOp, ThrSink, ThrSource, THR_PORT};
 
 static DEFAULT_SIZE: &str = "8";
 static DEFAULT_DURATION: &str = "60";
@@ -39,107 +41,161 @@ async fn main() {
 
     let args = CallArgs::parse();
 
-    let session = Arc::new(zenoh::open(zenoh::config::Config::default()).await.unwrap());
+    let session = Arc::new(
+        zenoh::open(zenoh::config::Config::default())
+            .res()
+            .await
+            .unwrap(),
+    );
     let hlc = async_std::sync::Arc::new(uhlc::HLC::default());
     let rt_uuid = uuid::Uuid::new_v4();
+    let runtime_name: Arc<str> = format!("thr-static-runtime-{}", rt_uuid).into();
     let ctx = RuntimeContext {
         session,
         hlc,
         loader: Arc::new(Loader::new(LoaderConfig::new())),
-        runtime_name: format!("thr-runtime-{}", rt_uuid).into(),
+        runtime_name: runtime_name.clone(),
         runtime_uuid: rt_uuid,
     };
-
-    let mut zf_graph =
-        zenoh_flow::runtime::dataflow::Dataflow::new(ctx.clone(), "thr-static".into(), None);
-
-    let source = Arc::new(ThrSource {});
-    let sink = Arc::new(ThrSink {});
-    let operator = Arc::new(ThrNoOp {});
 
     let config = serde_json::json!({"payload_size" : args.size, "multi": false});
     let config = Some(config);
 
-    zf_graph
-        .try_add_static_source(
-            "thr-source".into(),
-            None,
-            PortDescriptor {
-                port_id: String::from(THR_PORT).into(),
-                port_type: String::from("thr").into(),
-            },
-            source.initialize(&config).unwrap(),
-            source,
-        )
+    let mut zf_graph = zenoh_flow::runtime::dataflow::DataFlow::new("thr-static", ctx.clone());
+
+    /*
+     * Source
+     */
+    let source_record = SourceRecord {
+        id: "thr-source".into(),
+        uid: 0u32,
+        outputs: vec![PortRecord {
+            port_id: THR_PORT.into(),
+            port_type: "thr".into(),
+            uid: 1u32,
+        }],
+        uri: None,
+        configuration: config.clone(),
+        runtime: runtime_name.clone(),
+    };
+
+    zf_graph.add_source(
+        source_record,
+        |context: Context, configuration: Option<Configuration>, outputs: Outputs| {
+            Box::pin(async {
+                let node = ThrSource::new(context, configuration, outputs).await?;
+                Ok(Arc::new(node) as Arc<dyn Node>)
+            })
+        },
+    );
+
+    /*
+     * Sink
+     */
+    let sink_record = SinkRecord {
+        id: "thr-sink".into(),
+        uid: 10u32,
+        inputs: vec![PortRecord {
+            port_id: THR_PORT.into(),
+            port_type: "thr".into(),
+            uid: 11u32,
+        }],
+        uri: None,
+        configuration: config.clone(),
+        runtime: runtime_name.clone(),
+    };
+
+    zf_graph.add_sink(
+        sink_record,
+        |context: Context, configuration: Option<Configuration>, inputs: Inputs| {
+            Box::pin(async {
+                let node = ThrSink::new(context, configuration, inputs).await?;
+                Ok(Arc::new(node) as Arc<dyn Node>)
+            })
+        },
+    );
+
+    /*
+     * Operators
+     */
+    let operator_record = OperatorRecord {
+        id: "noop".into(),
+        uid: 20,
+        inputs: vec![PortRecord {
+            port_id: THR_PORT.into(),
+            port_type: "thr".into(),
+            uid: 21,
+        }],
+        outputs: vec![PortRecord {
+            port_id: THR_PORT.into(),
+            port_type: "thr".into(),
+            uid: 22,
+        }],
+        uri: None,
+        configuration: config.clone(),
+        runtime: runtime_name.clone(),
+    };
+
+    zf_graph.add_operator(
+        operator_record,
+        |context: Context,
+         configuration: Option<Configuration>,
+         inputs: Inputs,
+         outputs: Outputs| {
+            Box::pin(async {
+                let node = NoOp::new(context, configuration, inputs, outputs).await?;
+                Ok(Arc::new(node) as Arc<dyn Node>)
+            })
+        },
+    );
+
+    /*
+     * Links
+     */
+    zf_graph.add_link(
+        OutputDescriptor {
+            node: "thr-source".into(),
+            output: String::from(THR_PORT).into(),
+        },
+        InputDescriptor {
+            node: "noop".into(),
+            input: String::from(THR_PORT).into(),
+        },
+    );
+
+    zf_graph.add_link(
+        OutputDescriptor {
+            node: "noop".into(),
+            output: String::from(THR_PORT).into(),
+        },
+        InputDescriptor {
+            node: "thr-sink".into(),
+            input: String::from(THR_PORT).into(),
+        },
+    );
+
+    /*
+     * Creating the instance.
+     */
+    let mut instance = DataFlowInstance::try_instantiate(zf_graph, ctx.hlc.clone())
+        .await
         .unwrap();
 
-    zf_graph
-        .try_add_static_sink(
-            "thr-sink".into(),
-            PortDescriptor {
-                port_id: String::from(THR_PORT).into(),
-                port_type: String::from("thr").into(),
-            },
-            sink.initialize(&config).unwrap(),
-            sink,
-        )
-        .unwrap();
-
-    zf_graph
-        .try_add_static_operator(
-            "noop".into(),
-            vec![PortDescriptor {
-                port_id: String::from(THR_PORT).into(),
-                port_type: String::from("thr").into(),
-            }],
-            vec![PortDescriptor {
-                port_id: String::from(THR_PORT).into(),
-                port_type: String::from("thr").into(),
-            }],
-            None,
-            operator.initialize(&None).unwrap(),
-            operator,
-        )
-        .unwrap();
-
-    zf_graph
-        .try_add_link(
-            OutputDescriptor {
-                node: "thr-source".into(),
-                output: String::from(THR_PORT).into(),
-            },
-            InputDescriptor {
-                node: "noop".into(),
-                input: String::from(THR_PORT).into(),
-            },
-            None,
-            None,
-            None,
-        )
-        .unwrap();
-
-    zf_graph
-        .try_add_link(
-            OutputDescriptor {
-                node: "noop".into(),
-                output: String::from(THR_PORT).into(),
-            },
-            InputDescriptor {
-                node: "thr-sink".into(),
-                input: String::from(THR_PORT).into(),
-            },
-            None,
-            None,
-            None,
-        )
-        .unwrap();
-
-    let mut instance = DataflowInstance::try_instantiate(zf_graph).unwrap();
-
-    let nodes = instance.get_nodes();
-    for id in &nodes {
-        instance.start_node(id).await.unwrap()
+    for id in instance.get_sinks() {
+        instance.start_node(&id).unwrap();
     }
 
-    zenoh_flow::async_std::task::sleep(std::time::Duration::from_secs(args.duration)).await;
+    for id in instance.get_operators() {
+        instance.start_node(&id).unwrap();
+    }
+
+    for id in instance.get_connectors() {
+        instance.start_node(&id).unwrap();
+    }
+
+    for id in instance.get_sources() {
+        instance.start_node(&id).unwrap();
+    }
+
+    async_std::task::sleep(std::time::Duration::from_secs(args.duration)).await;
 }

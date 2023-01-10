@@ -12,15 +12,13 @@
 //   ZettaScale zenoh team, <zenoh@zettascale.tech>
 //
 
-use async_std::stream::StreamExt;
 use clap::Parser;
 use rand::Rng;
 use std::io::{self, Write};
 use std::time::Duration;
-use zenoh::net::protocol::io::SplitBuffer;
-use zenoh::prelude::*;
+use zenoh::prelude::r#async::*;
 use zenoh::publication::CongestionControl;
-use zenoh_flow::{Data, Message};
+use zenoh_flow::prelude::*;
 use zenoh_flow_perf::{get_epoch_us, Latency};
 
 static DEFAULT_PIPELINE: &str = "1";
@@ -40,24 +38,37 @@ struct CallArgs {
 }
 
 async fn ping(interval: f64, session: zenoh::Session) {
-    let key_expr_ping = session.declare_expr("/test/latency/ping").await.unwrap();
-    let key_expr_pong = session.declare_expr("/test/latency/pong").await.unwrap();
+    let key_expr_ping = session
+        .declare_keyexpr("test/latency/ping")
+        .res()
+        .await
+        .unwrap();
+    let key_expr_pong = session
+        .declare_keyexpr("test/latency/pong")
+        .res()
+        .await
+        .unwrap();
 
-    let sub = session.subscribe(&key_expr_pong).await.unwrap();
+    let sub = session
+        .declare_subscriber(&key_expr_pong)
+        .res()
+        .await
+        .unwrap();
 
     loop {
         async_std::task::sleep(Duration::from_secs_f64(interval)).await;
         let hlc = async_std::sync::Arc::new(uhlc::HLC::default());
 
         let msg = Latency { ts: get_epoch_us() };
-        let data = Data::from::<Latency>(msg);
-        let msg = Message::from_serdedata(data, hlc.new_timestamp(), vec![], vec![]);
+        let data = Data::from(msg);
+        let msg = Message::from_serdedata(data, hlc.new_timestamp());
 
         let value = msg.serialize_bincode().unwrap();
 
         session
             .put(&key_expr_ping, value)
             .congestion_control(CongestionControl::Block)
+            .res()
             .await
             .unwrap();
 
@@ -66,16 +77,28 @@ async fn ping(interval: f64, session: zenoh::Session) {
 }
 
 async fn pong(session: zenoh::Session, msgs: u64, pipeline: u64, udp: bool) {
-    let key_expr_ping = session.declare_expr("/test/latency/ping").await.unwrap();
-    let key_expr_pong = session.declare_expr("/test/latency/pong").await.unwrap();
+    let key_expr_ping = session
+        .declare_keyexpr("test/latency/ping")
+        .res()
+        .await
+        .unwrap();
+    let key_expr_pong = session
+        .declare_keyexpr("test/latency/pong")
+        .res()
+        .await
+        .unwrap();
     let pong_data: Vec<u8> = vec![];
-    let mut sub = session.subscribe(&key_expr_ping).await.unwrap();
+    let sub = session
+        .declare_subscriber(&key_expr_ping)
+        .res()
+        .await
+        .unwrap();
     let layer = match udp {
         true => "zenoh-udp",
         false => "zenoh",
     };
 
-    while let Some(msg) = sub.receiver().next().await {
+    while let Ok(msg) = sub.recv_async().await {
         let now = get_epoch_us();
         let de: Message = bincode::deserialize(&msg.value.payload.contiguous()).unwrap();
 
@@ -91,6 +114,7 @@ async fn pong(session: zenoh::Session, msgs: u64, pipeline: u64, udp: bool) {
             session
                 .put(&key_expr_pong, pong_data.clone())
                 .congestion_control(CongestionControl::Block)
+                .res()
                 .await
                 .unwrap();
         }
@@ -125,7 +149,7 @@ async fn main() {
             .unwrap();
     }
 
-    let session = zenoh::open(config).await.unwrap();
+    let session = zenoh::open(config).res().await.unwrap();
 
     if args.ping {
         ping(interval, session).await;

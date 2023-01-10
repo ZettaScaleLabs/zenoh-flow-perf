@@ -13,15 +13,10 @@
 //
 
 use clap::Parser;
-use std::sync::atomic::{AtomicU64, Ordering};
-use zenoh_flow::async_std::sync::Arc;
-use zenoh_flow::async_std::task;
-use zenoh_flow::runtime::dataflow::instance::link::link;
 
 static DEFAULT_INT: &str = "1";
 static DEFAULT_SIZE: &str = "8";
 static DEFAULT_DURATION: &str = "60";
-use std::time::Duration;
 
 #[derive(Parser, Debug)]
 struct CallArgs {
@@ -37,45 +32,50 @@ struct CallArgs {
 async fn main() {
     env_logger::init();
 
-    let args = CallArgs::parse();
+    // let args = CallArgs::parse();
 
-    let count: Arc<AtomicU64> = Arc::new(AtomicU64::new(0));
+    // let count: Arc<AtomicU64> = Arc::new(AtomicU64::new(0));
+    // let hlc = async_std::sync::Arc::new(uhlc::HLC::default());
 
-    let send_id = String::from("0");
-    let recv_id = String::from("10");
-    let (sender, receiver) = link::<Vec<u8>>(None, send_id.into(), recv_id.into());
-    // println!("layer,scenario,test,name,size,messages");
+    // let send_id = String::from("0");
+    // let recv_id = String::from("10");
+    // let (sender, receiver) = link(None, send_id.into(), recv_id.into(), hlc.clone());
+    // // println!("layer,scenario,test,name,size,messages");
 
-    let c = count.clone();
-    let i = args.interveal;
-    let s = args.size;
-    task::spawn(async move {
-        loop {
-            task::sleep(Duration::from_secs(i)).await;
-            let n = c.swap(0, Ordering::AcqRel);
-            let msgs = n / i;
-            println!(
-                "zenoh-flow-link,same-runtime,throughput,test-name,{},{}",
-                s, msgs
-            );
-        }
-    });
+    // let c = count.clone();
+    // let i = args.interveal;
+    // let s = args.size;
+    // task::spawn(async move {
+    //     loop {
+    //         task::sleep(Duration::from_secs(i)).await;
+    //         let n = c.swap(0, Ordering::AcqRel);
+    //         let msgs = n / i;
+    //         println!(
+    //             "zenoh-flow-link,same-runtime,throughput,test-name,{},{}",
+    //             s, msgs
+    //         );
+    //     }
+    // });
 
-    task::spawn(async move {
-        while let Ok((_, _data)) = receiver.recv().await {
-            count.fetch_add(1, Ordering::AcqRel);
-        }
-    });
+    // task::spawn(async move {
+    //     while let Ok(_data) = receiver.recv().await {
+    //         count.fetch_add(1, Ordering::AcqRel);
+    //     }
+    // });
 
-    let d = args.duration;
-    task::spawn(async move {
-        task::sleep(Duration::from_secs(d)).await;
-        std::process::exit(0);
-    });
+    // let d = args.duration;
+    // task::spawn(async move {
+    //     task::sleep(Duration::from_secs(d)).await;
+    //     std::process::exit(0);
+    // });
 
-    let data = Arc::new(vec![0; args.size as usize]);
+    // let data = Arc::new(vec![0u8; args.size as usize]);
 
-    loop {
-        sender.send(Arc::clone(&data)).await.unwrap();
-    }
+    // loop {
+    //     sender
+    //         .send(Data::from_arc_bytes(data.clone()), Some(0u64))
+    //         .await
+    //         .unwrap();
+    // }
+    println!("Needs to be updated");
 }

@@ -12,13 +12,13 @@
 //   ZettaScale zenoh team, <zenoh@zettascale.tech>
 //
 
+use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
-use zenoh_flow::serde::{Deserialize, Serialize};
+use zenoh_flow::prelude::*;
 use zenoh_flow::zenoh_flow_derive::ZFData;
-use zenoh_flow::{Deserializable, ZFData, ZFError, ZFResult};
 
 pub mod nodes;
 pub mod runtime;
@@ -35,19 +35,17 @@ pub struct ThrData {
 }
 
 impl ZFData for ThrData {
-    fn try_serialize(&self) -> zenoh_flow::ZFResult<Vec<u8>> {
+    fn try_serialize(&self) -> Result<Vec<u8>> {
         Ok(bincode::serialize(self)
-            .map_err(|_| ZFError::SerializationError)?
+            .map_err(|e| zferror!(ErrorKind::SerializationError, "{}", e))?
             .to_vec())
     }
-}
-
-impl Deserializable for ThrData {
-    fn try_deserialize(bytes: &[u8]) -> ZFResult<ThrData>
+    fn try_deserialize(bytes: &[u8]) -> Result<ThrData>
     where
         Self: Sized,
     {
-        bincode::deserialize::<ThrData>(bytes).map_err(|_| ZFError::DeseralizationError)
+        bincode::deserialize::<ThrData>(bytes)
+            .map_err(|e| zferror!(ErrorKind::DeserializationError, "{}", e).into())
     }
 }
 
@@ -58,19 +56,18 @@ pub struct LatData {
 }
 
 impl ZFData for LatData {
-    fn try_serialize(&self) -> zenoh_flow::ZFResult<Vec<u8>> {
+    fn try_serialize(&self) -> Result<Vec<u8>> {
         Ok(bincode::serialize(self)
-            .map_err(|_| ZFError::SerializationError)?
+            .map_err(|e| zferror!(ErrorKind::SerializationError, "{}", e))?
             .to_vec())
     }
-}
 
-impl Deserializable for LatData {
-    fn try_deserialize(bytes: &[u8]) -> ZFResult<LatData>
+    fn try_deserialize(bytes: &[u8]) -> Result<LatData>
     where
         Self: Sized,
     {
-        bincode::deserialize::<LatData>(bytes).map_err(|_| ZFError::DeseralizationError)
+        bincode::deserialize::<LatData>(bytes)
+            .map_err(|e| zferror!(ErrorKind::DeserializationError, "{}", e).into())
     }
 }
 
@@ -87,19 +84,18 @@ pub struct Latency {
 }
 
 impl ZFData for Latency {
-    fn try_serialize(&self) -> zenoh_flow::ZFResult<Vec<u8>> {
+    fn try_serialize(&self) -> Result<Vec<u8>> {
         Ok(bincode::serialize(self)
-            .map_err(|_| ZFError::SerializationError)?
+            .map_err(|e| zferror!(ErrorKind::SerializationError, "{}", e))?
             .to_vec())
     }
-}
 
-impl Deserializable for Latency {
-    fn try_deserialize(bytes: &[u8]) -> ZFResult<Latency>
+    fn try_deserialize(bytes: &[u8]) -> Result<Latency>
     where
         Self: Sized,
     {
-        bincode::deserialize::<Latency>(bytes).map_err(|_| ZFError::DeseralizationError)
+        bincode::deserialize::<Latency>(bytes)
+            .map_err(|e| zferror!(ErrorKind::DeserializationError, "{}", e).into())
     }
 }
 
@@ -109,18 +105,17 @@ pub struct CriterionData {
 }
 
 impl ZFData for CriterionData {
-    fn try_serialize(&self) -> zenoh_flow::ZFResult<Vec<u8>> {
+    fn try_serialize(&self) -> Result<Vec<u8>> {
         Ok(bincode::serialize(self)
-            .map_err(|_| ZFError::SerializationError)?
+            .map_err(|e| zferror!(ErrorKind::SerializationError, "{}", e))?
             .to_vec())
     }
-}
 
-impl Deserializable for CriterionData {
-    fn try_deserialize(bytes: &[u8]) -> ZFResult<CriterionData>
+    fn try_deserialize(bytes: &[u8]) -> Result<CriterionData>
     where
         Self: Sized,
     {
-        bincode::deserialize::<CriterionData>(bytes).map_err(|_| ZFError::DeseralizationError)
+        bincode::deserialize::<CriterionData>(bytes)
+            .map_err(|e| zferror!(ErrorKind::DeserializationError, "{}", e).into())
     }
 }

@@ -12,18 +12,20 @@
 //   ZettaScale zenoh team, <zenoh@zettascale.tech>
 //
 
-use async_std::sync::Arc;
 use clap::Parser;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::str::FromStr;
-use zenoh_flow::model::link::PortDescriptor;
-use zenoh_flow::model::{InputDescriptor, OutputDescriptor};
-use zenoh_flow::runtime::dataflow::instance::DataflowInstance;
+use std::sync::Arc;
+use zenoh::prelude::r#async::*;
+use zenoh_flow::model::descriptor::{InputDescriptor, OutputDescriptor};
+use zenoh_flow::model::record::{OperatorRecord, PortRecord, SinkRecord, SourceRecord};
+use zenoh_flow::runtime::dataflow::instance::DataFlowInstance;
 use zenoh_flow::runtime::dataflow::loader::{Loader, LoaderConfig};
 use zenoh_flow::runtime::RuntimeContext;
-use zenoh_flow::Node;
-use zenoh_flow_perf::nodes::{IRNoOp, NoOp, ScalPingSource, ScalPongSink, LAT_PORT};
+use zenoh_flow_perf::nodes::{
+    NoOpFactory, ScalNoOpFactory, ScalPingSourceFactory, ScalPongSinkFactory, LAT_PORT,
+};
 
 static DEFAULT_FACTOR: &str = "0";
 static DEFAULT_FANKIND: &str = "in";
@@ -55,7 +57,7 @@ struct CallArgs {
     #[clap(short, long, default_value = DEFAULT_FANKIND)]
     kind: FanKind,
     #[clap(short, long, default_value = DEFAULT_FACTOR, help = "Scaling factor N, nodes will be 2^N")]
-    factor: u64,
+    factor: u32,
     #[clap(short, long, default_value = DEFAULT_MSGS)]
     msgs: u64,
 }
@@ -67,7 +69,7 @@ async fn main() {
 
     let interval = 1.0 / (args.msgs as f64);
 
-    let total_nodes: u64 = 1 << args.factor;
+    let total_nodes: u32 = 1 << args.factor;
 
     let config = match args.kind {
         FanKind::In => Some(
@@ -78,39 +80,75 @@ async fn main() {
         ),
     };
 
-    let session = Arc::new(zenoh::open(zenoh::config::Config::default()).await.unwrap());
+    let session = Arc::new(
+        zenoh::open(zenoh::config::Config::default())
+            .res()
+            .await
+            .unwrap(),
+    );
     let hlc = async_std::sync::Arc::new(uhlc::HLC::default());
 
     let rt_uuid = uuid::Uuid::new_v4();
+    let runtime_name: Arc<str> = format!("scal-static-runtime-{}", rt_uuid).into();
     let ctx = RuntimeContext {
         session,
         hlc,
         loader: Arc::new(Loader::new(LoaderConfig::new())),
-        runtime_name: format!("thr-runtime-{}", rt_uuid).into(),
+        runtime_name: runtime_name.clone(),
         runtime_uuid: rt_uuid,
     };
 
-    let mut zf_graph =
-        zenoh_flow::runtime::dataflow::Dataflow::new(ctx.clone(), "scal-static".into(), None);
+    let mut zf_graph = zenoh_flow::runtime::dataflow::DataFlow::new("scal-static", ctx.clone());
 
-    // Source
-    let source = Arc::new(ScalPingSource {});
-    zf_graph
-        .try_add_static_source(
-            "source".into(),
-            None,
-            PortDescriptor {
-                port_id: String::from(LAT_PORT).into(),
-                port_type: String::from("lat").into(),
-            },
-            source.initialize(&config).unwrap(),
-            source,
-        )
-        .unwrap();
+    /*
+     * Source
+     */
+    let source_record = SourceRecord {
+        id: "source".into(),
+        uid: 0u32,
+        outputs: vec![PortRecord {
+            port_id: LAT_PORT.into(),
+            port_type: "lat".into(),
+            uid: 1u32,
+        }],
+        uri: None,
+        configuration: config.clone(),
+        runtime: runtime_name.clone(),
+    };
+
+    zf_graph.add_source_factory(source_record, Arc::new(ScalPingSourceFactory));
+
+    /*
+     * Operators
+     */
+    for i in 0..total_nodes {
+        let uid = 10 * i + 20u32;
+        let operator_record = OperatorRecord {
+            id: format!("op-{i}").into(),
+            uid,
+            inputs: vec![PortRecord {
+                port_id: LAT_PORT.into(),
+                port_type: "lat".into(),
+                uid: uid + 1,
+            }],
+            outputs: vec![PortRecord {
+                port_id: LAT_PORT.into(),
+                port_type: "lat".into(),
+                uid: uid + 2,
+            }],
+            uri: None,
+            configuration: config.clone(),
+            runtime: runtime_name.clone(),
+        };
+
+        zf_graph.add_operator_factory(operator_record, Arc::new(NoOpFactory));
+    }
 
     match args.kind {
         FanKind::In => {
-            let sink = Arc::new(ScalPongSink {});
+            /*
+             * Sink
+             */
             let mut id_hm: HashMap<String, Value> = HashMap::new();
             id_hm.insert("id".to_string(), Value::Number(0.into()));
             let sink_config = Some(zenoh_flow_perf::nodes::dict_merge(
@@ -118,204 +156,168 @@ async fn main() {
                 &id_hm,
             ));
 
-            zf_graph
-                .try_add_static_sink(
-                    "sink".into(),
-                    PortDescriptor {
-                        port_id: String::from(LAT_PORT).into(),
-                        port_type: String::from("lat").into(),
-                    },
-                    sink.initialize(&sink_config).unwrap(),
-                    sink,
-                )
-                .unwrap();
-
-            // creating operators
-            for i in 0..total_nodes {
-                let op = Arc::new(NoOp {});
-
-                zf_graph
-                    .try_add_static_operator(
-                        format!("op-{i}").into(),
-                        vec![PortDescriptor {
-                            port_id: String::from(LAT_PORT).into(),
-                            port_type: String::from("lat").into(),
-                        }],
-                        vec![PortDescriptor {
-                            port_id: String::from(LAT_PORT).into(),
-                            port_type: String::from("lat").into(),
-                        }],
-                        None,
-                        op.initialize(&None).unwrap(),
-                        op,
-                    )
-                    .unwrap();
-            }
-
-            // creating ports
-            let mut inputs = vec![];
-            for i in 0..total_nodes {
-                inputs.push(PortDescriptor {
-                    port_id: format!("{}{}", LAT_PORT, i).into(),
+            let sink_record = SinkRecord {
+                id: "sink".into(),
+                uid: 10u32,
+                inputs: vec![PortRecord {
+                    port_id: LAT_PORT.into(),
                     port_type: "lat".into(),
+                    uid: 11u32,
+                }],
+                uri: None,
+                configuration: sink_config,
+                runtime: runtime_name.clone(),
+            };
+
+            zf_graph.add_sink_factory(
+                sink_record,
+                Arc::new(ScalPongSinkFactory {
+                    locator_tcp_port: 75389,
+                }),
+            );
+
+            /*
+             * Last special operator
+             */
+            let uid = 20 + total_nodes * 10;
+
+            let mut inputs = vec![];
+            let mut port_ids = vec![];
+            for i in 0..total_nodes {
+                let port_id = format!("{}{}", LAT_PORT, i);
+
+                inputs.push(PortRecord {
+                    port_id: port_id.clone().into(),
+                    port_type: "lat".into(),
+                    uid: uid + i,
                 });
+
+                port_ids.push(Value::String(port_id));
             }
 
-            // creating last operator (fan-in)
+            let port_ids_hm = HashMap::from([("port_ids".to_owned(), Value::Array(port_ids))]);
+            let last_op_config = Some(zenoh_flow_perf::nodes::dict_merge(
+                &config.clone().unwrap(),
+                &port_ids_hm,
+            ));
 
-            let last_op = Arc::new(IRNoOp {});
+            let operator_record = OperatorRecord {
+                id: "op-last".into(),
+                uid,
+                inputs,
+                outputs: vec![PortRecord {
+                    port_id: LAT_PORT.into(),
+                    port_type: "lat".into(),
+                    uid: uid + total_nodes,
+                }],
+                uri: None,
+                configuration: last_op_config,
+                runtime: runtime_name.clone(),
+            };
 
-            zf_graph
-                .try_add_static_operator(
-                    "op-last".into(),
-                    inputs,
-                    vec![PortDescriptor {
-                        port_id: String::from(LAT_PORT).into(),
-                        port_type: String::from("lat").into(),
-                    }],
-                    None,
-                    last_op.initialize(&None).unwrap(),
-                    last_op,
-                )
-                .unwrap();
+            zf_graph.add_operator_factory(operator_record, Arc::new(ScalNoOpFactory));
 
-            // last to sink link
-            zf_graph
-                .try_add_link(
+            /*
+             * Links
+             */
+            zf_graph.add_link(
+                OutputDescriptor {
+                    node: "op-last".into(),
+                    output: LAT_PORT.into(),
+                },
+                InputDescriptor {
+                    node: "sink".into(),
+                    input: LAT_PORT.into(),
+                },
+            );
+
+            for i in 0..total_nodes {
+                zf_graph.add_link(
                     OutputDescriptor {
-                        node: "op-last".into(),
+                        node: "source".into(),
                         output: LAT_PORT.into(),
                     },
                     InputDescriptor {
-                        node: "sink".into(),
+                        node: format!("op-{i}").into(),
                         input: LAT_PORT.into(),
                     },
-                    None,
-                    None,
-                    None,
-                )
-                .unwrap();
+                );
 
-            // operators
-            for i in 0..total_nodes {
-                // link src to op
-                zf_graph
-                    .try_add_link(
-                        OutputDescriptor {
-                            node: "source".into(),
-                            output: LAT_PORT.into(),
-                        },
-                        InputDescriptor {
-                            node: format!("op-{i}").into(),
-                            input: LAT_PORT.into(),
-                        },
-                        None,
-                        None,
-                        None,
-                    )
-                    .unwrap();
-
-                // link op to last-op
-
-                zf_graph
-                    .try_add_link(
-                        OutputDescriptor {
-                            node: format!("op-{i}").into(),
-                            output: LAT_PORT.into(),
-                        },
-                        InputDescriptor {
-                            node: "op-last".into(),
-                            input: format!("{}{}", LAT_PORT, i).into(),
-                        },
-                        None,
-                        None,
-                        None,
-                    )
-                    .unwrap();
+                zf_graph.add_link(
+                    OutputDescriptor {
+                        node: format!("op-{i}").into(),
+                        output: LAT_PORT.into(),
+                    },
+                    InputDescriptor {
+                        node: "op-last".into(),
+                        input: format!("{}{}", LAT_PORT, i).into(),
+                    },
+                );
             }
         }
         FanKind::Out => {
-            // Creating operators
+            /*
+             * Sinks
+             */
             for i in 0..total_nodes {
-                let op = Arc::new(NoOp {});
-
-                zf_graph
-                    .try_add_static_operator(
-                        format!("op-{i}").into(),
-                        vec![PortDescriptor {
-                            port_id: String::from(LAT_PORT).into(),
-                            port_type: String::from("lat").into(),
-                        }],
-                        vec![PortDescriptor {
-                            port_id: String::from(LAT_PORT).into(),
-                            port_type: String::from("lat").into(),
-                        }],
-                        None,
-                        op.initialize(&None).unwrap(),
-                        op,
-                    )
-                    .unwrap();
-            }
-
-            // creating sinks
-            for i in 0..total_nodes {
+                let uid = 10 + 2 * i;
                 let mut id_hm: HashMap<String, Value> = HashMap::new();
+                // CAVEAT: This `id` is used by the Sink to declare its publisher. Its value should
+                // be equal to `i`.
                 id_hm.insert("id".to_string(), i.into());
                 let sink_config = Some(zenoh_flow_perf::nodes::dict_merge(
                     &config.clone().unwrap(),
                     &id_hm,
                 ));
 
-                let sink = Arc::new(ScalPongSink {});
+                let sink_record = SinkRecord {
+                    id: format!("sink-{i}").into(),
+                    uid,
+                    inputs: vec![PortRecord {
+                        port_id: LAT_PORT.into(),
+                        port_type: "lat".into(),
+                        uid: uid + 1,
+                    }],
+                    uri: None,
+                    configuration: sink_config,
+                    runtime: runtime_name.clone(),
+                };
 
-                zf_graph
-                    .try_add_static_sink(
-                        format!("sink-{i}").into(),
-                        PortDescriptor {
-                            port_id: String::from(LAT_PORT).into(),
-                            port_type: String::from("lat").into(),
-                        },
-                        sink.initialize(&sink_config).unwrap(),
-                        sink,
-                    )
-                    .unwrap();
+                zf_graph.add_sink_factory(
+                    sink_record,
+                    Arc::new(ScalPongSinkFactory {
+                        locator_tcp_port: 32894 + i as usize,
+                    }),
+                );
             }
 
-            // creating links
+            /*
+             * Links
+             */
             for i in 0..total_nodes {
                 // link src to op
-                zf_graph
-                    .try_add_link(
-                        OutputDescriptor {
-                            node: "source".into(),
-                            output: LAT_PORT.into(),
-                        },
-                        InputDescriptor {
-                            node: format!("op-{i}").into(),
-                            input: LAT_PORT.into(),
-                        },
-                        None,
-                        None,
-                        None,
-                    )
-                    .unwrap();
+                zf_graph.add_link(
+                    OutputDescriptor {
+                        node: "source".into(),
+                        output: LAT_PORT.into(),
+                    },
+                    InputDescriptor {
+                        node: format!("op-{i}").into(),
+                        input: LAT_PORT.into(),
+                    },
+                );
 
                 // link op to sink
-                zf_graph
-                    .try_add_link(
-                        OutputDescriptor {
-                            node: format!("op-{i}").into(),
-                            output: LAT_PORT.into(),
-                        },
-                        InputDescriptor {
-                            node: format!("sink-{i}").into(),
-                            input: LAT_PORT.into(),
-                        },
-                        None,
-                        None,
-                        None,
-                    )
-                    .unwrap();
+                zf_graph.add_link(
+                    OutputDescriptor {
+                        node: format!("op-{i}").into(),
+                        output: LAT_PORT.into(),
+                    },
+                    InputDescriptor {
+                        node: format!("sink-{i}").into(),
+                        input: LAT_PORT.into(),
+                    },
+                );
             }
         }
         _ => panic!("Not yet implemented..."),
@@ -323,27 +325,25 @@ async fn main() {
 
     // run the dataflow graph
 
-    let mut instance = DataflowInstance::try_instantiate(zf_graph).unwrap();
+    let mut instance = DataFlowInstance::try_instantiate(zf_graph, ctx.hlc.clone())
+        .await
+        .unwrap();
 
-    let mut sinks = instance.get_sinks();
-    for id in sinks.drain(..) {
-        instance.start_node(&id).await.unwrap()
+    for id in instance.get_sinks() {
+        instance.start_node(&id).unwrap()
     }
 
-    let mut operators = instance.get_operators();
-    for id in operators.drain(..) {
-        instance.start_node(&id).await.unwrap()
+    for id in instance.get_operators() {
+        instance.start_node(&id).unwrap()
     }
 
-    let mut connectors = instance.get_connectors();
-    for id in connectors.drain(..) {
-        instance.start_node(&id).await.unwrap()
+    for id in instance.get_connectors() {
+        instance.start_node(&id).unwrap()
     }
 
-    let sources = instance.get_sources();
-    for id in &sources {
-        instance.start_node(id).await.unwrap()
+    for id in instance.get_sources() {
+        instance.start_node(&id).unwrap()
     }
 
-    let () = std::future::pending().await;
+    std::future::pending::<()>().await;
 }

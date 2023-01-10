@@ -1,0 +1,9 @@
+id: NoOP
+uri: file://./python/noop.py
+inputs:
+  - id: Data
+    type: usize
+outputs:
+  - id: Data
+    type: usize
+tags: []

@@ -12,13 +12,12 @@
 //   ZettaScale zenoh team, <zenoh@zettascale.tech>
 //
 
-use async_std::stream::StreamExt;
 use clap::Parser;
 use rand::Rng;
 use std::time::Duration;
-use zenoh::net::protocol::io::SplitBuffer;
+use zenoh::prelude::r#async::*;
 use zenoh::publication::CongestionControl;
-use zenoh_flow::{Data, Message};
+use zenoh_flow::prelude::*;
 use zenoh_flow_perf::{get_epoch_us, Latency};
 
 static DEFAULT_PIPELINE: &str = "1";
@@ -40,27 +39,29 @@ struct CallArgs {
 }
 
 async fn publisher(interval: f64, session: zenoh::Session, drop: bool) {
-    let reskey = String::from("/test/latency");
+    let reskey = String::from("test/latency");
 
     loop {
         async_std::task::sleep(Duration::from_secs_f64(interval)).await;
         let hlc = async_std::sync::Arc::new(uhlc::HLC::default());
 
         let msg = Latency { ts: get_epoch_us() };
-        let data = Data::from::<Latency>(msg);
-        let msg = Message::from_serdedata(data, hlc.new_timestamp(), vec![], vec![]);
+        let data = Data::from(msg);
+        let msg = Message::from_serdedata(data, hlc.new_timestamp());
 
         let value = msg.serialize_bincode().unwrap();
         if drop {
             session
                 .put(&reskey, value)
                 .congestion_control(CongestionControl::Drop)
+                .res()
                 .await
                 .unwrap();
         } else {
             session
                 .put(&reskey, value)
                 .congestion_control(CongestionControl::Block)
+                .res()
                 .await
                 .unwrap();
         }
@@ -68,14 +69,14 @@ async fn publisher(interval: f64, session: zenoh::Session, drop: bool) {
 }
 
 async fn subscriber(session: zenoh::Session, msgs: u64, pipeline: u64, udp: bool) {
-    let reskey = String::from("/test/latency");
-    let mut sub = session.subscribe(&reskey).await.unwrap();
+    let reskey = String::from("test/latency");
+    let sub = session.declare_subscriber(&reskey).res().await.unwrap();
     let layer = match udp {
         true => "zenoh-lat-udp",
         false => "zenoh-lat",
     };
 
-    while let Some(msg) = sub.receiver().next().await {
+    while let Ok(msg) = sub.recv_async().await {
         let now = get_epoch_us();
         let de: Message = bincode::deserialize(&msg.value.payload.contiguous()).unwrap();
 
@@ -111,7 +112,7 @@ async fn main() {
             .unwrap();
     }
 
-    let session = zenoh::open(config).await.unwrap();
+    let session = zenoh::open(config).res().await.unwrap();
 
     if args.publisher {
         publisher(interval, session, args.drop).await;

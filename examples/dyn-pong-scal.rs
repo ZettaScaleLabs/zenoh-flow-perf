@@ -12,13 +12,14 @@
 //   ZettaScale zenoh team, <zenoh@zettascale.tech>
 //
 
-use zenoh_flow::async_std::sync::Arc;
-use zenoh_flow::Sink;
-use zenoh_flow::{export_sink, types::ZFResult};
-use zenoh_flow_perf::nodes::ScalPongSink;
+use std::sync::Arc;
+use zenoh_flow::prelude::*;
+use zenoh_flow_perf::nodes::ScalPongSinkFactory;
 
-export_sink!(register);
+export_sink_factory!(register);
 
-fn register() -> ZFResult<Arc<dyn Sink>> {
-    Ok(Arc::new(ScalPongSink) as Arc<dyn Sink>)
+fn register() -> Result<Arc<dyn SinkFactoryTrait>> {
+    Ok(Arc::new(ScalPongSinkFactory {
+        locator_tcp_port: 82165,
+    }) as Arc<dyn SinkFactoryTrait>)
 }

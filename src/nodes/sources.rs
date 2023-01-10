@@ -1,92 +1,108 @@
+//
+// Copyright (c) 2022 ZettaScale Technology
+//
+// This program and the accompanying materials are made available under the
+// terms of the Eclipse Public License 2.0 which is available at
+// http://www.eclipse.org/legal/epl-2.0, or the Apache License, Version 2.0
+// which is available at https://www.apache.org/licenses/LICENSE-2.0.
+//
+// SPDX-License-Identifier: EPL-2.0 OR Apache-2.0
+//
+// Contributors:
+//   ZettaScale Zenoh Team, <zenoh@zettascale.tech>
+//
+
 use crate::{get_epoch_us, Latency, ThrData};
 
+use async_std::sync::Mutex;
 use async_trait::async_trait;
+use std::sync::Arc;
 use std::time::Duration;
-use zenoh::prelude::*;
-use zenoh::subscriber::Subscriber;
-use zenoh_flow::async_std::sync::Arc;
-use zenoh_flow::zenoh_flow_derive::ZFState;
-use zenoh_flow::{Configuration, Context, Data, Node, Source, State, ZFResult};
+use zenoh::{prelude::r#async::*, subscriber::FlumeSubscriber};
+use zenoh_flow::prelude::*;
 
-// Latency SOURCE
-#[derive(Debug)]
-pub struct LatSource;
+use super::{LAT_PORT, THR_PORT};
 
-#[derive(Debug, ZFState)]
-struct LatSourceState {
-    interval: f64,
+/*
+ ***************************************************************************************************
+ *
+ *  LATENCY
+ *
+ ***************************************************************************************************
+ */
+
+pub struct LatSource {
+    sleep_interval: Duration,
+    output: Output<Latency>,
 }
 
-#[async_trait]
-impl Source for LatSource {
-    async fn run(&self, _context: &mut Context, state: &mut State) -> zenoh_flow::ZFResult<Data> {
-        let real_state = state.try_get::<LatSourceState>()?;
-
-        async_std::task::sleep(Duration::from_secs_f64(real_state.interval)).await;
-
-        let msg = Latency { ts: get_epoch_us() };
-
-        Ok(Data::from::<Latency>(msg))
+#[async_trait::async_trait]
+impl Node for LatSource {
+    async fn iteration(&self) -> Result<()> {
+        async_std::task::sleep(self.sleep_interval).await;
+        self.output.send(Latency { ts: get_epoch_us() }, None).await
     }
 }
 
-impl Node for LatSource {
-    fn initialize(&self, configuration: &Option<Configuration>) -> ZFResult<State> {
+#[async_trait::async_trait]
+impl Source for LatSource {
+    async fn new(
+        _context: Context,
+        configuration: Option<Configuration>,
+        mut outputs: Outputs,
+    ) -> Result<Self> {
         let interval = match configuration {
-            Some(conf) => conf["interval"].as_f64().unwrap(),
+            Some(config) => config["interval"].as_f64().unwrap(),
             None => 1.0f64,
         };
 
-        Ok(State::from(LatSourceState { interval }))
-    }
+        let sleep_interval = Duration::from_secs_f64(interval);
+        let output = outputs.take(LAT_PORT).expect("Missing output $LAT_PORT");
 
-    fn finalize(&self, _state: &mut State) -> ZFResult<()> {
-        Ok(())
+        Ok(LatSource {
+            sleep_interval,
+            output,
+        })
     }
 }
 
-// Ping SOURCE
+/*
+ ***************************************************************************************************
+ *
+ *  PING
+ *
+ ***************************************************************************************************
+ */
 
-#[derive(Debug)]
-pub struct PingSource;
+pub struct PingSource<'a> {
+    state: Arc<Mutex<PingSourceState<'a>>>,
+    output: Output<Latency>,
+}
 
-#[derive(Debug, ZFState)]
-struct PingSourceState {
+#[derive(Debug, Clone)]
+struct PingSourceState<'a> {
     interval: f64,
-    sub: Subscriber<'static>,
+    sub: Arc<FlumeSubscriber<'a>>,
     first: bool,
 }
 
-impl PingSourceState {
-    fn new(interval: f64, sub: Subscriber<'static>) -> Self {
+impl<'a> PingSourceState<'a> {
+    fn new(interval: f64, sub: FlumeSubscriber<'a>) -> Self {
         Self {
             interval,
-            sub,
+            sub: Arc::new(sub),
             first: true,
         }
     }
 }
 
 #[async_trait]
-impl Source for PingSource {
-    async fn run(&self, _context: &mut Context, state: &mut State) -> zenoh_flow::ZFResult<Data> {
-        let mut real_state = state.try_get::<PingSourceState>()?;
-
-        async_std::task::sleep(Duration::from_secs_f64(real_state.interval)).await;
-        if !real_state.first {
-            let _ = real_state.sub.recv();
-        } else {
-            real_state.first = false;
-        }
-
-        let msg = Latency { ts: get_epoch_us() };
-
-        Ok(Data::from::<Latency>(msg))
-    }
-}
-
-impl Node for PingSource {
-    fn initialize(&self, configuration: &Option<Configuration>) -> ZFResult<State> {
+impl<'a> Source for PingSource<'a> {
+    async fn new(
+        _context: Context,
+        configuration: Option<Configuration>,
+        mut outputs: Outputs,
+    ) -> Result<Self> {
         let interval = match configuration {
             Some(conf) => conf["interval"].as_f64().unwrap(),
             None => 1.0f64,
@@ -96,46 +112,62 @@ impl Node for PingSource {
         config
             .set_mode(Some(zenoh::config::whatami::WhatAmI::Peer))
             .unwrap();
-        let session = zenoh::open(config).wait().unwrap().into_arc();
+        let session = zenoh::open(config).res().await.unwrap().into_arc();
 
-        let key_expr_pong = session
-            .declare_expr("/test/latency/zf/pong")
-            .wait()
+        let key_expr = session
+            .declare_keyexpr("test/latency/zf/pong")
+            .res()
+            .await
             .unwrap();
 
-        let sub = session.subscribe(&key_expr_pong).wait().unwrap();
+        let sub = session.declare_subscriber(key_expr).res().await.unwrap();
 
-        Ok(State::from(PingSourceState::new(interval, sub)))
+        let state = Arc::new(Mutex::new(PingSourceState::new(interval, sub)));
+
+        let output = outputs.take(LAT_PORT).unwrap();
+
+        Ok(PingSource { state, output })
     }
+}
 
-    fn finalize(&self, _state: &mut State) -> ZFResult<()> {
+#[async_trait]
+impl<'a> Node for PingSource<'a> {
+    async fn iteration(&self) -> Result<()> {
+        let mut state = self.state.lock().await;
+        async_std::task::sleep(Duration::from_secs_f64(state.interval)).await;
+        if !state.first {
+            let _ = state.sub.recv();
+        } else {
+            state.first = false;
+        }
+
+        self.output
+            .send(Latency { ts: get_epoch_us() }, None)
+            .await?;
         Ok(())
     }
 }
 
-// THR SOURCE
+/*
+ ***************************************************************************************************
+ *
+ *  THROUGHPUT
+ *
+ ***************************************************************************************************
+ */
 
-#[derive(Debug)]
-pub struct ThrSource;
-
-#[derive(Debug, ZFState)]
-struct ThrSourceState {
-    pub data: Arc<ThrData>,
+pub struct ThrSource {
+    data: Arc<ThrData>,
+    output: OutputRaw,
 }
 
 #[async_trait]
 impl Source for ThrSource {
-    async fn run(&self, _context: &mut Context, state: &mut State) -> zenoh_flow::ZFResult<Data> {
-        let real_state = state.try_get::<ThrSourceState>()?;
-
-        let data = real_state.data.clone();
-
-        Ok(Data::from_arc::<ThrData>(data))
-    }
-}
-
-impl Node for ThrSource {
-    fn initialize(&self, configuration: &Option<Configuration>) -> ZFResult<State> {
+    async fn new(
+        _context: Context,
+        configuration: Option<Configuration>,
+        mut outputs: Outputs,
+    ) -> Result<Self> {
         let payload_size = match configuration {
             Some(conf) => conf["payload_size"].as_u64().unwrap() as usize,
             None => 8usize,
@@ -147,69 +179,86 @@ impl Node for ThrSource {
                 .collect::<Vec<u8>>(),
         });
 
-        Ok(State::from(ThrSourceState { data }))
-    }
+        let output = outputs.take_raw(THR_PORT).unwrap();
 
-    fn finalize(&self, _state: &mut State) -> ZFResult<()> {
-        Ok(())
+        Ok(ThrSource { data, output })
     }
 }
 
-// Scalability Ping SOURCE
+#[async_trait]
+impl Node for ThrSource {
+    async fn iteration(&self) -> Result<()> {
+        self.output
+            .send(Payload::from(self.data.clone()), None)
+            .await
+    }
+}
 
-#[derive(Debug)]
-pub struct ScalPingSource;
+/*
+ ***************************************************************************************************
+ *
+ *  SCALABILITY SOURCE
+ *
+ ***************************************************************************************************
+ */
 
-#[derive(Debug, ZFState)]
-struct ScalPingSourceState {
+pub struct ScalPingSource<'a> {
+    state: Arc<Mutex<ScalPingSourceState<'a>>>,
+    output: Output<Latency>,
+}
+
+#[async_trait]
+impl<'a> Node for ScalPingSource<'a> {
+    async fn iteration(&self) -> Result<()> {
+        let mut state = self.state.lock().await;
+        async_std::task::sleep(Duration::from_secs_f64(state.interval)).await;
+        if !state.first {
+            for sub in &*state.subs {
+                let _ = sub.recv();
+            }
+        } else {
+            state.first = false;
+        }
+
+        self.output.send(Latency { ts: get_epoch_us() }, None).await
+    }
+}
+
+#[derive(Debug, Clone)]
+struct ScalPingSourceState<'a> {
     interval: f64,
-    subs: Vec<Subscriber<'static>>,
+    subs: Arc<Vec<FlumeSubscriber<'a>>>,
     first: bool,
 }
 
-impl ScalPingSourceState {
-    fn new(interval: f64, subs: Vec<Subscriber<'static>>) -> Self {
+impl<'a> ScalPingSourceState<'a> {
+    fn new(interval: f64, subs: Vec<FlumeSubscriber<'a>>) -> Self {
         Self {
             interval,
-            subs,
+            subs: Arc::new(subs),
             first: true,
         }
     }
 }
 
 #[async_trait]
-impl Source for ScalPingSource {
-    async fn run(&self, _context: &mut Context, state: &mut State) -> zenoh_flow::ZFResult<Data> {
-        let mut real_state = state.try_get::<ScalPingSourceState>()?;
-
-        async_std::task::sleep(Duration::from_secs_f64(real_state.interval)).await;
-        if !real_state.first {
-            for sub in &real_state.subs {
-                let _ = sub.recv();
-            }
-        } else {
-            real_state.first = false;
-        }
-
-        let msg = Latency { ts: get_epoch_us() };
-
-        Ok(Data::from::<Latency>(msg))
-    }
-}
-
-impl Node for ScalPingSource {
-    fn initialize(&self, configuration: &Option<Configuration>) -> ZFResult<State> {
-        let interval = match configuration {
+impl<'a> Source for ScalPingSource<'a> {
+    async fn new(
+        _ctx: Context,
+        configuration: Option<Configuration>,
+        mut outputs: Outputs,
+    ) -> Result<Self> {
+        let interval = match &configuration {
             Some(conf) => conf["interval"].as_f64().unwrap(),
             None => 1.0f64,
         };
 
-        let nodes = match configuration {
+        let nodes = match &configuration {
             Some(conf) => conf["nodes"].as_u64().unwrap(),
             None => 1u64,
         };
 
-        let mode = match configuration {
+        let mode = match &configuration {
             Some(conf) => conf["mode"].as_u64().unwrap(),
             None => 1u64,
         };
@@ -218,38 +267,45 @@ impl Node for ScalPingSource {
         config
             .set_mode(Some(zenoh::config::whatami::WhatAmI::Peer))
             .unwrap();
-        let session = zenoh::open(config).wait().unwrap().into_arc();
+        let session = zenoh::open(config).res().await.unwrap().into_arc();
 
         let mut key_exp_vec = vec![];
         let mut subs = vec![];
+
         if mode == 2 {
             // 2 means fan out, 1 means fan in
 
             for i in 0..nodes {
                 let key_expr_pong = session
-                    .declare_expr(format!("/test/latency/zf/pong/{i}"))
-                    .wait()
+                    .declare_keyexpr(format!("test/latency/zf/pong/{i}"))
+                    .res()
+                    .await
                     .unwrap();
                 key_exp_vec.push(key_expr_pong);
             }
 
             for kx in &key_exp_vec {
-                let sub = session.subscribe(kx).wait().unwrap();
+                let sub = session.declare_subscriber(kx).res().await.unwrap();
                 subs.push(sub);
             }
         } else {
             let key_expr_pong = session
-                .declare_expr("/test/latency/zf/pong/0")
-                .wait()
+                .declare_keyexpr("test/latency/zf/pong/0")
+                .res()
+                .await
                 .unwrap();
-            let sub = session.subscribe(key_expr_pong).wait().unwrap();
+            let sub = session
+                .declare_subscriber(key_expr_pong)
+                .res()
+                .await
+                .unwrap();
             subs.push(sub);
         }
 
-        Ok(State::from(ScalPingSourceState::new(interval, subs)))
-    }
+        let state = Arc::new(Mutex::new(ScalPingSourceState::new(interval, subs)));
 
-    fn finalize(&self, _state: &mut State) -> ZFResult<()> {
-        Ok(())
+        let output = outputs.take(LAT_PORT).unwrap();
+
+        Ok(ScalPingSource { state, output })
     }
 }

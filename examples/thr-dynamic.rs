@@ -12,13 +12,13 @@
 //   ZettaScale zenoh team, <zenoh@zettascale.tech>
 //
 
-use std::collections::HashMap;
-
 use clap::Parser;
-use zenoh_flow::model::dataflow::descriptor::DataFlowDescriptor;
-use zenoh_flow::model::link::{LinkDescriptor, PortDescriptor};
-use zenoh_flow::model::node::{OperatorDescriptor, SinkDescriptor, SourceDescriptor};
-use zenoh_flow::model::{InputDescriptor, OutputDescriptor};
+use std::collections::HashMap;
+use zenoh_flow::model::descriptor::{
+    FlattenDataFlowDescriptor, InputDescriptor, LinkDescriptor, OperatorDescriptor,
+    OutputDescriptor, PortDescriptor, SinkDescriptor, SourceDescriptor,
+};
+use zenoh_flow_perf::runtime::Descriptor;
 
 static DEFAULT_PIPELINE: &str = "1";
 static DEFAULT_SIZE: &str = "8";
@@ -57,7 +57,7 @@ async fn main() {
     if args.runtime {
         zenoh_flow_perf::runtime::runtime(
             args.name,
-            args.descriptor_file.clone(),
+            Descriptor::Flatten(args.descriptor_file.clone()),
             args.listen,
             args.connect,
         )
@@ -70,17 +70,14 @@ async fn main() {
 
     // Creating the descriptor
 
-    let mut dfd = DataFlowDescriptor {
+    let mut dfd = FlattenDataFlowDescriptor {
         flow: format!("thr-pipeline{}", args.pipeline),
         operators: vec![],
         sources: vec![],
         sinks: vec![],
         links: vec![],
         mapping: None,
-        deadlines: None,
-        loops: None,
         global_configuration: None,
-        flags: None,
     };
 
     // Source and Sink
@@ -88,24 +85,23 @@ async fn main() {
     let (source_descriptor, sink_descriptor) = {
         let src = SourceDescriptor {
             id: "source".into(),
-            period: None,
-            output: PortDescriptor {
+            outputs: vec![PortDescriptor {
                 port_id: PORT.into(),
                 port_type: "data".into(),
-            },
+            }],
             uri: Some(String::from(SRC_URI)),
             configuration: config.clone(),
-            runtime: None,
+            tags: vec![],
         };
         let snk = SinkDescriptor {
             id: "sink".into(),
-            input: PortDescriptor {
+            inputs: vec![PortDescriptor {
                 port_id: PORT.into(),
                 port_type: "data".into(),
-            },
+            }],
             uri: Some(String::from(SNK_URI)),
             configuration: config,
-            runtime: None,
+            tags: vec![],
         };
         (src, snk)
     };
@@ -129,8 +125,7 @@ async fn main() {
             }],
             uri: Some(String::from(NOOP_URI)),
             configuration: None,
-            runtime: None,
-            deadline: None,
+            tags: vec![],
         };
         dfd.operators.push(op_descriptor);
     }

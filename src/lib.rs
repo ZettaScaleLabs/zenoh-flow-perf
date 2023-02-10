@@ -75,8 +75,12 @@ pub fn get_epoch_us() -> u128 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()
-        .as_micros()
+        .as_nanos()
 }
+
+
+
+
 
 #[derive(Debug, Clone, ZFData, Serialize, Deserialize)]
 pub struct Latency {

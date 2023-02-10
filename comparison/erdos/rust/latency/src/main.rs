@@ -44,7 +44,7 @@ pub fn get_epoch_us() -> u128 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()
-        .as_micros()
+        .as_nanos()
 }
 
 #[derive(Clone)]
@@ -133,7 +133,7 @@ impl Sink<(), Latency> for LatSink {
         let now = get_epoch_us();
         let elapsed = now - data.ts;
 
-        println!("erdos,single,latency,1,8,{},{elapsed},us", self.msgs);
+        println!("erdos,single,latency,1,8,{},{elapsed},ns", self.msgs);
     }
     fn on_watermark(&mut self, _ctx: &mut SinkContext<'_, ()>) {}
 

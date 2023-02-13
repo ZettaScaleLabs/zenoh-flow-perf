@@ -106,6 +106,11 @@ def generate_launch_description():
             output='screen'),
         Node(
             package='nodes',
+            executable='mandalay',
+            parameters=[mb_param_dir],
+            output='screen'),
+        Node(
+            package='nodes',
             executable='monaco',
             parameters=[mb_param_dir],
             output='screen'),

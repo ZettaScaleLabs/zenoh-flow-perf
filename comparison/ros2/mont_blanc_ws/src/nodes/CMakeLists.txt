@@ -87,6 +87,7 @@ setup(hebron src/hebron_node.cpp)
 setup(kingston src/kingston_node.cpp)
 setup(lyon src/lyon_node.cpp)
 setup(madellin src/madellin_node.cpp)
+setup(mandalay src/mandalay_node.cpp)
 setup(monaco src/monaco_node.cpp)
 setup(osaka src/osaka_node.cpp)
 setup(ponce src/ponce_node.cpp)
@@ -106,7 +107,7 @@ target_link_libraries(arequipa argparse)
 
 # INSTALL
 
-install(TARGETS arequipa barcelona cordoba delhi freeport geneva georgetown hamburg hebron kingston lyon madellin monaco osaka ponce portsmouth rotterdam taipei tripoli
+install(TARGETS arequipa barcelona cordoba delhi freeport geneva georgetown hamburg hebron kingston lyon madellin mandalay monaco osaka ponce portsmouth rotterdam taipei tripoli
   DESTINATION lib/${PROJECT_NAME}
 )
 

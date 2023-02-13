@@ -267,7 +267,7 @@ void Hebron::publish_message() {
 Kingston::Kingston() : rclcpp::Node("kingston", rclcpp::NodeOptions().use_intra_process_comms(false)) {
     auto qos = rclcpp::QoS(rclcpp::KeepAll()).reliable();
     this->pace = std::chrono::duration<double>(0.1); // 100ms
-    this->publisher = this->create_publisher<geometry_msgs::msg::Vector3>("/chenab", qos);
+    this->publisher = this->create_publisher<geometry_msgs::msg::Vector3>("/yamuna", qos);
     this->timer = this->create_wall_timer(pace, std::bind(&Kingston::publish_message, this));
     this->data = ato::utils::random_vector3();
     RCLCPP_INFO(this->get_logger(), "Init Kingston pace is %f", pace.count());

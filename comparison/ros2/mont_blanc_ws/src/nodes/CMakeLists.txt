@@ -30,9 +30,17 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(rclcpp REQUIRED)
-find_package(argparse REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
+
+
+include(FetchContent)
+FetchContent_Declare(
+    argparse
+    GIT_REPOSITORY https://github.com/p-ranav/argparse.git
+)
+FetchContent_MakeAvailable(argparse)
+
 
 ## BUILD
 
@@ -88,6 +96,7 @@ setup(taipei src/taipei_node.cpp)
 setup(tripoli src/tripoli_node.cpp)
 
 
+target_link_libraries(arequipa argparse)
 # target_link_libraries(arequipa ${PROJECT_NAME}_lib)
 # target_include_directories(arequipa PUBLIC
 #   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>

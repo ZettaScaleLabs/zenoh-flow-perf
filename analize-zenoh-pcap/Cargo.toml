@@ -1,0 +1,19 @@
+[package]
+name = "analize-zenoh-pcap"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+# zenoh-flow = "0.4.0-alpha.1"
+prettytable-rs = "^0.10"
+zenoh = { git = "https://github.com/eclipse-zenoh/zenoh", version = "=0.7.0-rc" }
+zenoh-buffers = { git = "https://github.com/eclipse-zenoh/zenoh", version = "=0.7.0-rc" }
+zenoh-protocol = {git = "https://github.com/eclipse-zenoh/zenoh", version = "=0.7.0-rc"}
+zenoh-codec = { git = "https://github.com/eclipse-zenoh/zenoh", version = "=0.7.0-rc" }
+clap = { version = "4.0", features = ["derive"] }
+async-std = { version = "=1.12.0", features = ["attributes"] }
+sniffglue = "0.15.0"
+env_logger = "0.10.0"
+log = "0.4"

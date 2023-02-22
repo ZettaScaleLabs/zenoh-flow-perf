@@ -46,6 +46,7 @@ Arequipa::Arequipa(const std::string file_name) : rclcpp::Node("arqequipa", rclc
 
     auto qos_sub = rclcpp::QoS(rclcpp::KeepAll()).reliable();
     this->subscriber = this->create_subscription<std_msgs::msg::String>("/arkansas", qos_sub, std::bind(&Arequipa::receiver_callback, this, std::placeholders::_1));
+    RCLCPP_INFO(this->get_logger(), "Init Arequipa opening file %s", file_name.c_str());
     this->outfile.open(file_name);
 }
 
@@ -54,6 +55,7 @@ Arequipa::~Arequipa() {
 }
 
 void Arequipa::receiver_callback(const std_msgs::msg::String::SharedPtr msg) {
+    // RCLCPP_INFO(this->get_logger(), "CB Arequipa");
     this->outfile << msg->data << std::endl;
 
 }
@@ -61,7 +63,7 @@ void Arequipa::receiver_callback(const std_msgs::msg::String::SharedPtr msg) {
 
 // Barcellona
 
-Barcelona::Barcelona() : rclcpp::Node("arqequipa", rclcpp::NodeOptions().use_intra_process_comms(false)) {
+Barcelona::Barcelona() : rclcpp::Node("barcelona", rclcpp::NodeOptions().use_intra_process_comms(false)) {
     auto qos_pub = rclcpp::QoS(rclcpp::KeepAll()).reliable();
     auto qos_sub = rclcpp::QoS(rclcpp::KeepAll()).reliable();
 
@@ -226,7 +228,9 @@ Hamburg::Hamburg() : rclcpp::Node("hamburg", rclcpp::NodeOptions().use_intra_pro
 }
 
 void Hamburg::publish_message() {
-        this->publisher->publish(this->data);
+    std_msgs::msg::String msg  = std_msgs::msg::String();
+    msg.data = this->data.data + ":" +this->danube_val.data;
+    this->publisher->publish(this->data);
 }
 
 void Hamburg::receiver_tigris(const std_msgs::msg::Float32::SharedPtr msg) {

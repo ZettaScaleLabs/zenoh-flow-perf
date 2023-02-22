@@ -22,8 +22,8 @@ int main (int argc, char* argv[]) {
     rclcpp::executors::SingleThreadedExecutor executor;
 
 
-    auto barcelona = std::make_shared<ato::nodes::Barcelona>();
-    executor.add_node(barcelona);
+    auto node = std::make_shared<ato::nodes::Cordoba>();
+    executor.add_node(node);
 
     executor.spin();
 

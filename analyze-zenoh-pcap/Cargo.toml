@@ -12,10 +12,10 @@ name = "analyze-zenoh-pcap"
 [dependencies]
 # zenoh-flow = "0.4.0-alpha.1"
 prettytable-rs = "^0.10"
-zenoh = { git = "https://github.com/eclipse-zenoh/zenoh", version = "=0.7.0-rc" }
-zenoh-buffers = { git = "https://github.com/eclipse-zenoh/zenoh", version = "=0.7.0-rc" }
-zenoh-protocol = {git = "https://github.com/eclipse-zenoh/zenoh", version = "=0.7.0-rc"}
-zenoh-codec = { git = "https://github.com/eclipse-zenoh/zenoh", version = "=0.7.0-rc" }
+zenoh = { path = "/Volumes/Workspace/Workspace/zettascale/zenoh/zenoh/zenoh"}
+zenoh-buffers = { path = "/Volumes/Workspace/Workspace/zettascale/zenoh/zenoh/commons/zenoh-buffers" }
+zenoh-protocol = {path = "/Volumes/Workspace/Workspace/zettascale/zenoh/zenoh/commons/zenoh-protocol"}
+zenoh-codec = { path = "/Volumes/Workspace/Workspace/zettascale/zenoh/zenoh/commons/zenoh-codec" }
 clap = { version = "4.0", features = ["derive"] }
 async-std = { version = "=1.12.0", features = ["attributes"] }
 sniffglue = "0.15.0"

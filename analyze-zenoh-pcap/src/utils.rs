@@ -11,25 +11,20 @@
 // Contributors:
 //   ZettaScale Zenoh Team, <zenoh@zettascale.tech>
 //
+use crate::types::TCPEndpoint;
+use crate::{
+    IP_HDR_BLOCK_LEN, TCP_HDR_LEN, ZENOH_FRAME_SIZE_LEN, ZENOH_MULTICAST_PORT, ZENOH_UNICAST_PORT,
+};
+use async_std::sync::Arc;
 use sniffglue::centrifuge::*;
 use sniffglue::structs::ether::Ether;
 use sniffglue::structs::ipv4::IPv4;
-// use sniffglue::structs::ipv6::IPv6;
-use crate::types::TCPEndpoint;
-use crate::{types::SizedTransportMessage, ZENOH_FRAME_SIZE_LEN};
-use crate::{IP_HDR_BLOCK_LEN, TCP_HDR_LEN, ZENOH_MULTICAST_PORT, ZENOH_UNICAST_PORT};
-use async_std::sync::Arc;
 use sniffglue::structs::raw::Raw;
 use sniffglue::structs::tcp::TCP;
 use sniffglue::structs::udp::UDP;
+// use sniffglue::structs::ipv6::IPv6;
 use std::collections::HashMap;
-use std::num::NonZeroUsize;
-use zenoh_buffers::reader::BacktrackableReader;
-use zenoh_buffers::reader::DidntRead;
-use zenoh_buffers::reader::Reader;
 use zenoh_buffers::ZSlice;
-use zenoh_codec::{RCodec, Zenoh060};
-use zenoh_protocol::transport::TransportMessage;
 
 pub fn read(data: &[u8]) -> Option<(ZSlice, usize)> {
     let mut buffer: Vec<u8> = Vec::new();
@@ -55,21 +50,6 @@ pub fn read_messages(data: Vec<u8>) -> Vec<ZSlice> {
         }
     }
     slices
-}
-
-impl<R> RCodec<SizedTransportMessage, &mut R> for Zenoh060
-where
-    R: Reader + BacktrackableReader,
-{
-    type Error = DidntRead;
-
-    fn read(self, reader: &mut R) -> Result<SizedTransportMessage, Self::Error> {
-        let len = reader.remaining();
-        let message: TransportMessage = self.read(&mut *reader)?;
-        let size = NonZeroUsize::new(len - reader.remaining()).unwrap();
-
-        Ok(SizedTransportMessage(message, size))
-    }
 }
 
 pub fn parse_pcap(

@@ -19,5 +19,6 @@ const IP_HDR_BLOCK_LEN: usize = 4;
 const TCP_HDR_LEN: usize = 20;
 
 pub mod analysis;
+pub mod codecs;
 pub mod types;
 pub mod utils;

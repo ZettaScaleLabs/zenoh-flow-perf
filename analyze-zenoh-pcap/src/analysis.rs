@@ -15,7 +15,8 @@
 use std::collections::HashMap;
 
 use crate::types::{
-    SessionStatistics, SizedTransportMessage, TCPEndpoint, TransportStatistics, ZenohStatistics,
+    SessionStatistics, SizedFrame, SizedFramePayload, SizedTransportBody, SizedTransportMessage,
+    SizedZenohBody, SizedZenohMessage, TCPEndpoint, TransportStatistics, ZenohStatistics,
 };
 use crate::utils::read_messages;
 use zenoh_buffers::reader::HasReader;
@@ -23,8 +24,6 @@ use zenoh_buffers::reader::Reader;
 use zenoh_buffers::SplitBuffer;
 use zenoh_codec::RCodec;
 use zenoh_codec::Zenoh060;
-use zenoh_protocol::transport::{Frame, FramePayload, TransportBody};
-use zenoh_protocol::zenoh::{ZenohBody, ZenohMessage};
 
 pub fn analyze_zenoh_tcp(
     tcp_sessions: HashMap<(TCPEndpoint, TCPEndpoint), Vec<u8>>,
@@ -45,6 +44,13 @@ pub fn analyze_zenoh_tcp(
             let mut total_declare = 0;
             let mut total_linkstate = 0;
 
+            let mut total_data_bytes = 0;
+            let mut total_unit_bytes = 0;
+            let mut total_pull_bytes = 0;
+            let mut total_query_bytes = 0;
+            let mut total_declare_bytes = 0;
+            let mut total_linkstate_bytes = 0;
+
             // Transport Messages
             let mut total_frames = 0;
             let mut total_initsyn = 0;
@@ -56,10 +62,19 @@ pub fn analyze_zenoh_tcp(
             let mut total_keepalive = 0;
             let mut total_tx_msgs = 0;
 
+            let mut total_frames_bytes = 0;
+            let mut total_initsyn_bytes = 0;
+            let mut total_initack_bytes = 0;
+            let mut total_opensyn_bytes = 0;
+            let mut total_openack_bytes = 0;
+            let mut total_join_bytes = 0;
+            let mut total_close_bytes = 0;
+            let mut total_keepalive_bytes = 0;
+
             let mut total_bytes = 0;
 
             let mut deserialized: Vec<SizedTransportMessage> = vec![];
-            let mut zmsgs: Vec<ZenohMessage> = vec![];
+            let mut zmsgs: Vec<SizedZenohMessage> = vec![];
 
             let codec = Zenoh060::default();
 
@@ -75,48 +90,83 @@ pub fn analyze_zenoh_tcp(
                 }
             }
 
-            for smsg in deserialized.drain(..) {
-                let SizedTransportMessage(msg, msg_size) = smsg;
-                total_bytes += msg_size.get();
+            for msg in deserialized.drain(..) {
+                total_bytes += msg.size.get();
                 total_tx_msgs += 1;
-                log::debug!("[Parsing] Zenoh Frame message is {msg:?}");
+                // log::debug!("[Parsing] Zenoh Frame message is {msg:?}");
                 match msg.body {
-                    TransportBody::Frame(Frame { payload, .. }) => {
+                    SizedTransportBody::Frame(SizedFrame { payload, size, .. }) => {
                         total_frames += 1;
+                        total_frames_bytes += size.get();
                         match payload {
-                            FramePayload::Messages { mut messages } => zmsgs.append(&mut messages),
+                            SizedFramePayload::Messages { mut messages } => {
+                                zmsgs.append(&mut messages)
+                            }
                             _ => (),
                         }
                     }
-                    TransportBody::InitSyn(_) => total_initsyn += 1,
-                    TransportBody::InitAck(_) => total_initack += 1,
-                    TransportBody::OpenSyn(_) => total_opensyn += 1,
-                    TransportBody::OpenAck(_) => total_openack += 1,
-                    TransportBody::Join(_) => total_join += 1,
-                    TransportBody::Close(_) => total_close += 1,
-                    TransportBody::KeepAlive(_) => total_keepalive += 1,
+                    SizedTransportBody::InitSyn(tb) => {
+                        total_initsyn += 1;
+                        total_initsyn_bytes += tb.0.get();
+                    }
+                    SizedTransportBody::InitAck(tb) => {
+                        total_initack += 1;
+                        total_initack_bytes += tb.0.get();
+                    }
+                    SizedTransportBody::OpenSyn(tb) => {
+                        total_opensyn += 1;
+                        total_opensyn_bytes += tb.0.get();
+                    }
+                    SizedTransportBody::OpenAck(tb) => {
+                        total_openack += 1;
+                        total_openack_bytes += tb.0.get();
+                    }
+                    SizedTransportBody::Join(tb) => {
+                        total_join += 1;
+                        total_join_bytes += tb.0.get();
+                    }
+                    SizedTransportBody::Close(tb) => {
+                        total_close += 1;
+                        total_close_bytes += tb.0.get();
+                    }
+                    SizedTransportBody::KeepAlive(tb) => {
+                        total_keepalive += 1;
+                        total_keepalive_bytes += tb.0.get();
+                    }
                 }
             }
 
             for msg in zmsgs {
                 match msg.body {
-                    ZenohBody::Data(data_msg) => {
+                    SizedZenohBody::Data(data_msg) => {
                         total_data += 1;
-                        total_payload += data_msg.payload.len();
+                        total_payload += data_msg.1.payload.len();
+                        total_data_bytes += data_msg.0.get();
                     }
-                    ZenohBody::Unit(_unit_msg) => {
+                    SizedZenohBody::Unit(unit_msg) => {
                         total_unit += 1;
+                        total_unit_bytes += unit_msg.0.get();
                     }
-                    ZenohBody::Pull(_pull_msg) => total_pull += 1,
-                    ZenohBody::Query(query_msg) => {
+                    SizedZenohBody::Pull(pull_msg) => {
+                        total_pull += 1;
+                        total_pull_bytes += pull_msg.0.get();
+                    }
+                    SizedZenohBody::Query(query_msg) => {
                         total_query += 1;
-                        match query_msg.body {
+                        total_query_bytes += query_msg.0.get();
+                        match query_msg.1.body {
                             Some(body) => total_query_payload += body.payload.len(),
                             _ => (),
                         }
                     }
-                    ZenohBody::Declare(_declare_msg) => total_declare += 1,
-                    ZenohBody::LinkStateList(_linkstate_msg) => total_linkstate += 1,
+                    SizedZenohBody::Declare(declare_msg) => {
+                        total_declare += 1;
+                        total_declare_bytes += declare_msg.0.get();
+                    }
+                    SizedZenohBody::LinkStateList(linkstate_msg) => {
+                        total_linkstate += 1;
+                        total_linkstate_bytes += linkstate_msg.0.get();
+                    }
                 }
             }
 
@@ -128,36 +178,36 @@ pub fn analyze_zenoh_tcp(
                 total_data_payload: total_payload,
                 total_query_paylaod: total_query_payload,
                 total_data: total_data,
-                total_data_bytes: 0,
+                total_data_bytes,
                 total_unit: total_unit,
-                total_unit_bytes: 0,
+                total_unit_bytes,
                 total_pull: total_pull,
-                total_pull_bytes: 0,
+                total_pull_bytes,
                 total_query: total_query,
-                total_query_bytes: 0,
+                total_query_bytes,
                 total_declare: total_declare,
-                total_declare_bytes: 0,
+                total_declare_bytes,
                 total_linkstate: total_linkstate,
-                total_linkstate_bytes: 0,
+                total_linkstate_bytes,
             };
 
             let transport_statistics = TransportStatistics {
                 total_frames,
-                total_frames_bytes: 0,
+                total_frames_bytes,
                 total_initsyn,
-                total_initsyn_bytes: 0,
+                total_initsyn_bytes,
                 total_initack,
-                total_initack_bytes: 0,
+                total_initack_bytes,
                 total_opensyn,
-                total_opensyn_bytes: 0,
+                total_opensyn_bytes,
                 total_openack,
-                total_openack_bytes: 0,
+                total_openack_bytes,
                 total_join,
-                total_join_bytes: 0,
+                total_join_bytes,
                 total_close,
-                total_close_bytes: 0,
+                total_close_bytes,
                 total_keepalive,
-                total_keepalive_bytes: 0,
+                total_keepalive_bytes,
                 total_tx_msgs,
                 total_bytes,
             };

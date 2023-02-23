@@ -14,7 +14,12 @@
 
 use std::net::IpAddr;
 use std::num::NonZeroUsize;
-use zenoh_protocol::transport::TransportMessage;
+use zenoh::prelude::ZInt;
+use zenoh_buffers::ZSlice;
+use zenoh_protocol::common::Attachment;
+use zenoh_protocol::core::Channel;
+use zenoh_protocol::transport::{Close, InitAck, InitSyn, Join, KeepAlive, OpenAck, OpenSyn};
+use zenoh_protocol::zenoh::{Data, Declare, LinkStateList, Pull, Query, RoutingContext, Unit};
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct TCPEndpoint {
@@ -69,4 +74,64 @@ pub struct SessionStatistics {
     pub overhead: usize,
 }
 
-pub struct SizedTransportMessage(pub TransportMessage, pub NonZeroUsize);
+// Zenoh Transport and Messages wrappers
+
+pub struct SizedTransportMessage {
+    pub body: SizedTransportBody,
+    pub attachment: Option<Attachment>,
+    pub size: NonZeroUsize,
+}
+
+pub struct SizedInitSyn(pub NonZeroUsize, pub InitSyn);
+pub struct SizedInitAck(pub NonZeroUsize, pub InitAck);
+pub struct SizedOpenSyn(pub NonZeroUsize, pub OpenSyn);
+pub struct SizedOpenAck(pub NonZeroUsize, pub OpenAck);
+pub struct SizedJoin(pub NonZeroUsize, pub Join);
+pub struct SizedClose(pub NonZeroUsize, pub Close);
+pub struct SizedKeepAlive(pub NonZeroUsize, pub KeepAlive);
+
+pub enum SizedTransportBody {
+    InitSyn(SizedInitSyn),
+    InitAck(SizedInitAck),
+    OpenSyn(SizedOpenSyn),
+    OpenAck(SizedOpenAck),
+    Join(SizedJoin),
+    Close(SizedClose),
+    KeepAlive(SizedKeepAlive),
+    Frame(SizedFrame),
+}
+
+pub struct SizedFrame {
+    pub channel: Channel,
+    pub sn: ZInt,
+    pub payload: SizedFramePayload,
+    pub size: NonZeroUsize,
+}
+
+pub enum SizedFramePayload {
+    Fragment { buffer: ZSlice, is_final: bool },
+    Messages { messages: Vec<SizedZenohMessage> },
+}
+
+pub struct SizedZenohMessage {
+    pub body: SizedZenohBody,
+    pub channel: Channel,
+    pub routing_context: Option<RoutingContext>,
+    pub attachment: Option<Attachment>,
+}
+
+pub struct SizedData(pub NonZeroUsize, pub Data);
+pub struct SizedUnit(pub NonZeroUsize, pub Unit);
+pub struct SizedPull(pub NonZeroUsize, pub Pull);
+pub struct SizedQuery(pub NonZeroUsize, pub Query);
+pub struct SizedDeclare(pub NonZeroUsize, pub Declare);
+pub struct SizedLinkStateList(pub NonZeroUsize, pub LinkStateList);
+
+pub enum SizedZenohBody {
+    Data(SizedData),
+    Unit(SizedUnit),
+    Pull(SizedPull),
+    Query(SizedQuery),
+    Declare(SizedDeclare),
+    LinkStateList(SizedLinkStateList),
+}

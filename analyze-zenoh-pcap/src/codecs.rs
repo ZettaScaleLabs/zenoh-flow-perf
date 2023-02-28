@@ -107,7 +107,7 @@ where
     fn read(self, reader: &mut R) -> Result<SizedInitSyn, Self::Error> {
         let len = reader.remaining();
         let msg: InitSyn = self.read(&mut *reader)?;
-        let size = NonZeroUsize::new(len - reader.remaining()).ok_or_else(|| DidntRead)?;
+        let size = NonZeroUsize::new(len - reader.remaining() + 1).ok_or_else(|| DidntRead)?;
         Ok(SizedInitSyn(size, msg))
     }
 }
@@ -121,7 +121,7 @@ where
     fn read(self, reader: &mut R) -> Result<SizedInitSyn, Self::Error> {
         let len = reader.remaining();
         let msg: InitSyn = self.read(&mut *reader)?;
-        let size = NonZeroUsize::new(len - reader.remaining()).ok_or_else(|| DidntRead)?;
+        let size = NonZeroUsize::new(len - reader.remaining() + 1).ok_or_else(|| DidntRead)?;
         Ok(SizedInitSyn(size, msg))
     }
 }
@@ -135,7 +135,7 @@ where
     fn read(self, reader: &mut R) -> Result<SizedInitAck, Self::Error> {
         let len = reader.remaining();
         let msg: InitAck = self.read(&mut *reader)?;
-        let size = NonZeroUsize::new(len - reader.remaining()).ok_or_else(|| DidntRead)?;
+        let size = NonZeroUsize::new(len - reader.remaining() + 1).ok_or_else(|| DidntRead)?;
         Ok(SizedInitAck(size, msg))
     }
 }
@@ -149,7 +149,7 @@ where
     fn read(self, reader: &mut R) -> Result<SizedInitAck, Self::Error> {
         let len = reader.remaining();
         let msg: InitAck = self.read(&mut *reader)?;
-        let size = NonZeroUsize::new(len - reader.remaining()).ok_or_else(|| DidntRead)?;
+        let size = NonZeroUsize::new(len - reader.remaining() + 1).ok_or_else(|| DidntRead)?;
         Ok(SizedInitAck(size, msg))
     }
 }
@@ -163,7 +163,7 @@ where
     fn read(self, reader: &mut R) -> Result<SizedOpenSyn, Self::Error> {
         let len = reader.remaining();
         let msg: OpenSyn = self.read(&mut *reader)?;
-        let size = NonZeroUsize::new(len - reader.remaining()).ok_or_else(|| DidntRead)?;
+        let size = NonZeroUsize::new(len - reader.remaining() + 1).ok_or_else(|| DidntRead)?;
         Ok(SizedOpenSyn(size, msg))
     }
 }
@@ -177,7 +177,7 @@ where
     fn read(self, reader: &mut R) -> Result<SizedOpenSyn, Self::Error> {
         let len = reader.remaining();
         let msg: OpenSyn = self.read(&mut *reader)?;
-        let size = NonZeroUsize::new(len - reader.remaining()).ok_or_else(|| DidntRead)?;
+        let size = NonZeroUsize::new(len - reader.remaining() + 1).ok_or_else(|| DidntRead)?;
         Ok(SizedOpenSyn(size, msg))
     }
 }
@@ -191,7 +191,7 @@ where
     fn read(self, reader: &mut R) -> Result<SizedOpenAck, Self::Error> {
         let len = reader.remaining();
         let msg: OpenAck = self.read(&mut *reader)?;
-        let size = NonZeroUsize::new(len - reader.remaining()).ok_or_else(|| DidntRead)?;
+        let size = NonZeroUsize::new(len - reader.remaining() + 1).ok_or_else(|| DidntRead)?;
         Ok(SizedOpenAck(size, msg))
     }
 }
@@ -205,7 +205,7 @@ where
     fn read(self, reader: &mut R) -> Result<SizedOpenAck, Self::Error> {
         let len = reader.remaining();
         let msg: OpenAck = self.read(&mut *reader)?;
-        let size = NonZeroUsize::new(len - reader.remaining()).ok_or_else(|| DidntRead)?;
+        let size = NonZeroUsize::new(len - reader.remaining() + 1).ok_or_else(|| DidntRead)?;
         Ok(SizedOpenAck(size, msg))
     }
 }
@@ -219,7 +219,7 @@ where
     fn read(self, reader: &mut R) -> Result<SizedJoin, Self::Error> {
         let len = reader.remaining();
         let msg: Join = self.read(&mut *reader)?;
-        let size = NonZeroUsize::new(len - reader.remaining()).ok_or_else(|| DidntRead)?;
+        let size = NonZeroUsize::new(len - reader.remaining() + 1).ok_or_else(|| DidntRead)?;
         Ok(SizedJoin(size, msg))
     }
 }
@@ -233,7 +233,7 @@ where
     fn read(self, reader: &mut R) -> Result<SizedJoin, Self::Error> {
         let len = reader.remaining();
         let msg: Join = self.read(&mut *reader)?;
-        let size = NonZeroUsize::new(len - reader.remaining()).ok_or_else(|| DidntRead)?;
+        let size = NonZeroUsize::new(len - reader.remaining() + 1).ok_or_else(|| DidntRead)?;
         Ok(SizedJoin(size, msg))
     }
 }
@@ -247,7 +247,7 @@ where
     fn read(self, reader: &mut R) -> Result<SizedClose, Self::Error> {
         let len = reader.remaining();
         let msg: Close = self.read(&mut *reader)?;
-        let size = NonZeroUsize::new(len - reader.remaining()).ok_or_else(|| DidntRead)?;
+        let size = NonZeroUsize::new(len - reader.remaining() + 1).ok_or_else(|| DidntRead)?;
         Ok(SizedClose(size, msg))
     }
 }
@@ -261,7 +261,7 @@ where
     fn read(self, reader: &mut R) -> Result<SizedClose, Self::Error> {
         let len = reader.remaining();
         let msg: Close = self.read(&mut *reader)?;
-        let size = NonZeroUsize::new(len - reader.remaining()).ok_or_else(|| DidntRead)?;
+        let size = NonZeroUsize::new(len - reader.remaining() + 1).ok_or_else(|| DidntRead)?;
         Ok(SizedClose(size, msg))
     }
 }
@@ -275,7 +275,7 @@ where
     fn read(self, reader: &mut R) -> Result<SizedKeepAlive, Self::Error> {
         let len = reader.remaining();
         let msg: KeepAlive = self.read(&mut *reader)?;
-        let size = NonZeroUsize::new(len - reader.remaining()).ok_or_else(|| DidntRead)?;
+        let size = NonZeroUsize::new(len - reader.remaining() + 1).ok_or_else(|| DidntRead)?;
         Ok(SizedKeepAlive(size, msg))
     }
 }
@@ -289,7 +289,7 @@ where
     fn read(self, reader: &mut R) -> Result<SizedKeepAlive, Self::Error> {
         let len = reader.remaining();
         let msg: KeepAlive = self.read(&mut *reader)?;
-        let size = NonZeroUsize::new(len - reader.remaining()).ok_or_else(|| DidntRead)?;
+        let size = NonZeroUsize::new(len - reader.remaining() + 1).ok_or_else(|| DidntRead)?;
         Ok(SizedKeepAlive(size, msg))
     }
 }
@@ -434,7 +434,7 @@ where
     fn read(self, reader: &mut R) -> Result<SizedData, Self::Error> {
         let len = reader.remaining();
         let msg: Data = self.read(&mut *reader)?;
-        let size = NonZeroUsize::new(len - reader.remaining()).ok_or_else(|| DidntRead)?;
+        let size = NonZeroUsize::new(len - reader.remaining() + 1).ok_or_else(|| DidntRead)?;
         Ok(SizedData(size, msg))
     }
 }
@@ -448,7 +448,8 @@ where
     fn read(self, reader: &mut R) -> Result<SizedData, Self::Error> {
         let len = reader.remaining();
         let msg: Data = self.read(&mut *reader)?;
-        let size = NonZeroUsize::new(len - reader.remaining()).ok_or_else(|| DidntRead)?;
+        let size = NonZeroUsize::new(len - reader.remaining() + 1).ok_or_else(|| DidntRead)?;
+
         Ok(SizedData(size, msg))
     }
 }
@@ -462,7 +463,7 @@ where
     fn read(self, reader: &mut R) -> Result<SizedUnit, Self::Error> {
         let len = reader.remaining();
         let msg: Unit = self.read(&mut *reader)?;
-        let size = NonZeroUsize::new(len - reader.remaining()).ok_or_else(|| DidntRead)?;
+        let size = NonZeroUsize::new(len - reader.remaining() + 1).ok_or_else(|| DidntRead)?;
         Ok(SizedUnit(size, msg))
     }
 }
@@ -476,7 +477,7 @@ where
     fn read(self, reader: &mut R) -> Result<SizedUnit, Self::Error> {
         let len = reader.remaining();
         let msg: Unit = self.read(&mut *reader)?;
-        let size = NonZeroUsize::new(len - reader.remaining()).ok_or_else(|| DidntRead)?;
+        let size = NonZeroUsize::new(len - reader.remaining() + 1).ok_or_else(|| DidntRead)?;
         Ok(SizedUnit(size, msg))
     }
 }
@@ -490,7 +491,7 @@ where
     fn read(self, reader: &mut R) -> Result<SizedPull, Self::Error> {
         let len = reader.remaining();
         let msg: Pull = self.read(&mut *reader)?;
-        let size = NonZeroUsize::new(len - reader.remaining()).ok_or_else(|| DidntRead)?;
+        let size = NonZeroUsize::new(len - reader.remaining() + 1).ok_or_else(|| DidntRead)?;
         Ok(SizedPull(size, msg))
     }
 }
@@ -504,7 +505,7 @@ where
     fn read(self, reader: &mut R) -> Result<SizedPull, Self::Error> {
         let len = reader.remaining();
         let msg: Pull = self.read(&mut *reader)?;
-        let size = NonZeroUsize::new(len - reader.remaining()).ok_or_else(|| DidntRead)?;
+        let size = NonZeroUsize::new(len - reader.remaining() + 1).ok_or_else(|| DidntRead)?;
         Ok(SizedPull(size, msg))
     }
 }
@@ -518,7 +519,7 @@ where
     fn read(self, reader: &mut R) -> Result<SizedQuery, Self::Error> {
         let len = reader.remaining();
         let msg: Query = self.read(&mut *reader)?;
-        let size = NonZeroUsize::new(len - reader.remaining()).ok_or_else(|| DidntRead)?;
+        let size = NonZeroUsize::new(len - reader.remaining() + 1).ok_or_else(|| DidntRead)?;
         Ok(SizedQuery(size, msg))
     }
 }
@@ -532,7 +533,7 @@ where
     fn read(self, reader: &mut R) -> Result<SizedQuery, Self::Error> {
         let len = reader.remaining();
         let msg: Query = self.read(&mut *reader)?;
-        let size = NonZeroUsize::new(len - reader.remaining()).ok_or_else(|| DidntRead)?;
+        let size = NonZeroUsize::new(len - reader.remaining() + 1).ok_or_else(|| DidntRead)?;
         Ok(SizedQuery(size, msg))
     }
 }
@@ -546,7 +547,7 @@ where
     fn read(self, reader: &mut R) -> Result<SizedDeclare, Self::Error> {
         let len = reader.remaining();
         let msg: Declare = self.read(&mut *reader)?;
-        let size = NonZeroUsize::new(len - reader.remaining()).ok_or_else(|| DidntRead)?;
+        let size = NonZeroUsize::new(len - reader.remaining() + 1).ok_or_else(|| DidntRead)?;
         Ok(SizedDeclare(size, msg))
     }
 }
@@ -560,7 +561,7 @@ where
     fn read(self, reader: &mut R) -> Result<SizedDeclare, Self::Error> {
         let len = reader.remaining();
         let msg: Declare = self.read(&mut *reader)?;
-        let size = NonZeroUsize::new(len - reader.remaining()).ok_or_else(|| DidntRead)?;
+        let size = NonZeroUsize::new(len - reader.remaining() + 1).ok_or_else(|| DidntRead)?;
         Ok(SizedDeclare(size, msg))
     }
 }
@@ -574,7 +575,7 @@ where
     fn read(self, reader: &mut R) -> Result<SizedLinkStateList, Self::Error> {
         let len = reader.remaining();
         let msg: LinkStateList = self.read(&mut *reader)?;
-        let size = NonZeroUsize::new(len - reader.remaining()).ok_or_else(|| DidntRead)?;
+        let size = NonZeroUsize::new(len - reader.remaining() + 1).ok_or_else(|| DidntRead)?;
         Ok(SizedLinkStateList(size, msg))
     }
 }
@@ -588,7 +589,7 @@ where
     fn read(self, reader: &mut R) -> Result<SizedLinkStateList, Self::Error> {
         let len = reader.remaining();
         let msg: LinkStateList = self.read(&mut *reader)?;
-        let size = NonZeroUsize::new(len - reader.remaining()).ok_or_else(|| DidntRead)?;
+        let size = NonZeroUsize::new(len - reader.remaining() + 1).ok_or_else(|| DidntRead)?;
         Ok(SizedLinkStateList(size, msg))
     }
 }
